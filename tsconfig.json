@@ -28,6 +28,6 @@
 		"allowJs": true
 	},
 	"compileOnSave": false,
-	"include": ["li/**/*.ts", "li/**/*.js"],
+	"include": ["lib/**/*.ts", "lib/**/*.js"],
 	"exclude": ["node_modules/**"]
 }

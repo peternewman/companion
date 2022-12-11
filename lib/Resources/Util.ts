@@ -1,3 +1,7 @@
+import Registry from '../Registry.js'
+import { ButtonStyle } from '../tmp.js'
+import { MAX_BUTTONS, MAX_BUTTONS_PER_ROW } from './Constants.js'
+
 export function argb(
 	a: string | number,
 	r: string | number,
@@ -36,7 +40,7 @@ export function rgb(r: number | string, g: number | string, b: number | string, 
 	return ((r & 0xff) << 16) | ((g & 0xff) << 8) | (b & 0xff)
 }
 
-export const rgbRev = (dec) => {
+export function rgbRev(dec: number): { r: number; g: number; b: number } {
 	dec = Math.round(dec)
 
 	return {
@@ -62,19 +66,19 @@ export const getTimestamp = () => {
 	let out = year + month + day + '-' + hrs + mins
 	return out
 }
-export const convert2Digit = (num) => {
+export function convert2Digit(num: number): string | number {
 	if (num < 10) {
-		num = '0' + num
+		return '0' + num
 	}
 	return num
 }
 
-export const isFalsey = (val) => {
+export function isFalsey(val: string): boolean {
 	return (typeof val === 'string' && val.toLowerCase() == 'false') || val == '0'
 }
 
-export function parseLineParameters(line) {
-	const makeSafe = (index) => {
+export function parseLineParameters(line: string): Record<string, string | true | undefined> {
+	const makeSafe = (index: number) => {
 		return index === -1 ? Number.POSITIVE_INFINITY : index
 	}
 
@@ -123,7 +127,7 @@ export function parseLineParameters(line) {
 		}
 	}
 
-	const res = {}
+	const res: Record<string, string | true | undefined> = {}
 
 	for (const fragment of fragments) {
 		const [key, value] = fragment.split('=', 2)
@@ -133,24 +137,24 @@ export function parseLineParameters(line) {
 	return res
 }
 
-export function clamp(val, min, max) {
+export function clamp(val: number, min: number, max: number): number {
 	return Math.min(Math.max(val, min), max)
 }
 
 // From Global key number 0->31, to Device key f.ex 0->14
 // 0-4 would be 0-4, but 5-7 would be -1
 // and 8-12 would be 5-9
-export const toDeviceKey = (keysTotal, keysPerRow, key) => {
-	if (keysTotal == global.MAX_BUTTONS) {
+export function toDeviceKey(keysTotal: number, keysPerRow: number, key: number): number {
+	if (keysTotal == MAX_BUTTONS) {
 		return key
 	}
 
-	if (key % global.MAX_BUTTONS_PER_ROW > keysPerRow) {
+	if (key % MAX_BUTTONS_PER_ROW > keysPerRow) {
 		return -1
 	}
 
-	let row = Math.floor(key / global.MAX_BUTTONS_PER_ROW)
-	let col = key % global.MAX_BUTTONS_PER_ROW
+	let row = Math.floor(key / MAX_BUTTONS_PER_ROW)
+	let col = key % MAX_BUTTONS_PER_ROW
 
 	if (row >= keysTotal / keysPerRow || col >= keysPerRow) {
 		return -1
@@ -161,11 +165,11 @@ export const toDeviceKey = (keysTotal, keysPerRow, key) => {
 
 // From device key number to global key number
 // Reverse of toDeviceKey
-export const toGlobalKey = (keysPerRow, key) => {
+export function toGlobalKey(keysPerRow: number, key: number): number {
 	let rows = Math.floor(key / keysPerRow)
 	let col = key % keysPerRow
 
-	return rows * global.MAX_BUTTONS_PER_ROW + col
+	return rows * MAX_BUTTONS_PER_ROW + col
 }
 
 /**
@@ -174,7 +178,7 @@ export const toGlobalKey = (keysPerRow, key) => {
  * @param {0 | 90 | -90 | 180} rotation
  * @returns
  */
-export const rotateBuffer = (buffer, rotation) => {
+export function rotateBuffer(buffer: Buffer, rotation: -90 | 180 | 90 | 0): Buffer {
 	if (!buffer || buffer.length !== 15552) {
 		// malformed input, so return it back
 		return buffer
@@ -216,32 +220,34 @@ export const rotateBuffer = (buffer, rotation) => {
 	return buffer
 }
 
-export async function showFatalError(title, message) {
-	if (global.electron && global.electron.dialog) {
-		global.electron.dialog.showErrorBox(title, message)
-	} else {
-		console.error(message)
-	}
+export async function showFatalError(title: string, message: string) {
+	// TODO - reimplement this
+	// if (global.electron && global.electron.dialog) {
+	// 	global.electron.dialog.showErrorBox(title, message)
+	// } else {
+	console.error(message)
+	// }
 	process.exit(1)
 }
 
-export function sendOverIpc(data) {
+export function sendOverIpc(data: any) {
 	if (process.env.COMPANION_IPC_PARENT && process.send) {
 		process.send(data)
 	}
 }
 
+declare const __webpack_require__: any // HACK
 /**
  * Whether the application is packaged with webpack
  */
 export function isPackaged(): boolean {
-	return typeof global.__webpack_require__ === 'function'
+	return typeof __webpack_require__ === 'function'
 }
 
 /**
  * Get the size of the bitmap for a button
  */
-export function GetButtonBitmapSize(registry, style) {
+export function GetButtonBitmapSize(registry: Registry, style: ButtonStyle) {
 	let removeTopBar = !style.show_topbar
 	if (style.show_topbar === 'default' || style.show_topbar === undefined) {
 		removeTopBar = registry.userconfig.getKey('remove_topbar') === true
