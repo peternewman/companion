@@ -18,16 +18,19 @@
 import os from 'os'
 import got from 'got'
 import LogController from '../Log/Controller.js'
+import type { Registry, SocketClient } from '../tmp.js'
 
 class UIUpdate {
 	logger = LogController.createLogger('UI/Update')
 
-	latestUpdateData = null
+	latestUpdateData: unknown = null
+
+	registry: Registry
 
 	/**
 	 * @param {Registry} registry
 	 */
-	constructor(registry) {
+	constructor(registry: Registry) {
 		this.logger.silly('loading update')
 		this.registry = registry
 
@@ -44,24 +47,16 @@ class UIUpdate {
 	 * @param {SocketIO} client - the client socket
 	 * @access public
 	 */
-	clientConnect(client) {
+	clientConnect(client: SocketClient): void {
 		client.on('app-update-info', () => {
 			client.emit('app-update-info', this.latestUpdateData)
 		})
 	}
 
-	get io() {
-		if (this.registry) {
-			return this.registry.io
-		} else {
-			return null
-		}
-	}
-
 	getPayload() {
 		const x = new Date()
 		const offset = -x.getTimezoneOffset()
-		const off = (offset >= 0 ? '+' : '-') + parseInt(offset / 60)
+		const off = (offset >= 0 ? '+' : '-') + offset / 60
 
 		return {
 			// Information about the computer asking for a update. This way
@@ -80,7 +75,7 @@ class UIUpdate {
 		}
 	}
 
-	requestUpdate() {
+	private requestUpdate() {
 		got
 			.post('https://updates.bitfocus.io/updates', {
 				json: this.getPayload(),
@@ -90,8 +85,8 @@ class UIUpdate {
 				this.logger.debug('fresh update data received', body)
 				this.latestUpdateData = body
 
-				if (this.io) {
-					this.io.emit('app-update-info', body)
+				if (this.registry.io) {
+					this.registry.io.emit('app-update-info', body)
 				}
 			})
 			.catch((e) => {

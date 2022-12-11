@@ -1,16 +1,25 @@
-export const argb = (a, r, g, b, base = 10) => {
-	a = parseInt(a, base)
-	r = parseInt(r, base)
-	g = parseInt(g, base)
-	b = parseInt(b, base)
+export function argb(
+	a: string | number,
+	r: string | number,
+	g: string | number,
+	b: string | number,
+	base = 10
+): number | false {
+	a = parseInt(a as any, base)
+	r = parseInt(r as any, base)
+	g = parseInt(g as any, base)
+	b = parseInt(b as any, base)
 
 	if (isNaN(a) || isNaN(r) || isNaN(g) || isNaN(b)) return false
+	const rgbVal = rgb(r, g, b)
+	if (rgbVal === false) return false
+
 	return (
-		a * 0x1000000 + rgb(r, g, b) // bitwise doesn't work because JS bitwise is working with 32bit signed int
+		a * 0x1000000 + rgbVal // bitwise doesn't work because JS bitwise is working with 32bit signed int
 	)
 }
 
-export const decimalToRgb = (decimal) => {
+export function decimalToRgb(decimal: number): { red: number; green: number; blue: number } {
 	return {
 		red: (decimal >> 16) & 0xff,
 		green: (decimal >> 8) & 0xff,
@@ -18,10 +27,10 @@ export const decimalToRgb = (decimal) => {
 	}
 }
 
-export const rgb = (r, g, b, base = 10) => {
-	r = parseInt(r, base)
-	g = parseInt(g, base)
-	b = parseInt(b, base)
+export function rgb(r: number | string, g: number | string, b: number | string, base = 10): number | false {
+	r = parseInt(r as any, base)
+	g = parseInt(g as any, base)
+	b = parseInt(b as any, base)
 
 	if (isNaN(r) || isNaN(g) || isNaN(b)) return false
 	return ((r & 0xff) << 16) | ((g & 0xff) << 8) | (b & 0xff)
@@ -37,9 +46,9 @@ export const rgbRev = (dec) => {
 	}
 }
 
-export const delay = (milliseconds) => {
-	return new Promise((resolve) => {
-		setTimeout(() => resolve(), milliseconds)
+export function delay(milliseconds: number): Promise<void> {
+	return new Promise<void>((resolve) => {
+		setTimeout(() => resolve(), milliseconds || 1)
 	})
 }
 
@@ -209,7 +218,7 @@ export const rotateBuffer = (buffer, rotation) => {
 
 export async function showFatalError(title, message) {
 	if (global.electron && global.electron.dialog) {
-		dialog.showErrorBox(title, message)
+		global.electron.dialog.showErrorBox(title, message)
 	} else {
 		console.error(message)
 	}
@@ -225,8 +234,8 @@ export function sendOverIpc(data) {
 /**
  * Whether the application is packaged with webpack
  */
-export function isPackaged() {
-	return typeof __webpack_require__ === 'function'
+export function isPackaged(): boolean {
+	return typeof global.__webpack_require__ === 'function'
 }
 
 /**

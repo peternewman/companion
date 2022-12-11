@@ -2,16 +2,16 @@
  * Warning: this file needs to not reference any 'real' code in the codebase, or we end up with import cycle issues
  */
 import { cloneDeep } from 'lodash-es'
-import path from 'path'
 import stripAnsi from 'strip-ansi'
 import fs from 'fs-extra'
-import winston from 'winston'
+import winston, { Logger as WinstonLogger } from 'winston'
 import Transport from 'winston-transport'
 import supportsColor from 'supports-color'
 import consoleColors from './Colors.js'
 import { init, configureScope, addBreadcrumb } from '@sentry/node'
 import '@sentry/tracing'
 import debounceFn from 'debounce-fn'
+import type { Registry, SocketClient, SocketServerExt } from '../tmp'
 
 const SentrySeverity = {
 	debug: 'debug',
@@ -21,13 +21,11 @@ const SentrySeverity = {
 }
 
 class ToMemoryTransport extends Transport {
-	constructor(opts, addToHistory) {
+	constructor(opts: Transport.TransportStreamOptions, private readonly addToHistory: (info: any) => void) {
 		super(opts)
-
-		this.addToHistory = addToHistory
 	}
 
-	log(info, callback) {
+	log(info: any, callback: () => void): void {
 		this.addToHistory(info)
 
 		callback()
@@ -35,6 +33,15 @@ class ToMemoryTransport extends Transport {
 }
 
 const LogRoom = 'logs'
+
+interface LogLine {
+	time: number
+	source: string
+	level: string
+	message: string
+}
+
+export type ChildLogger = WinstonLogger
 
 /**
  * Logger for messages to send to the user in the UI
@@ -62,25 +69,28 @@ class LogController {
 	 * @type {function}
 	 * @access protected
 	 */
-	addBreadcrumb = null
+	private addBreadcrumb: typeof addBreadcrumb | null = null
+
 	/**
 	 * The log array
 	 * @type {Array[]}
 	 * @access protected
 	 */
-	history = []
+	private history: LogLine[] = []
+
 	/**
 	 * The application core
-	 * @type {Registry}
-	 * @access protected
 	 */
-	registry = null
+	private registry: Registry | null = null
+
+	private readonly winston: WinstonLogger
+	private readonly logger: ChildLogger
 
 	/**
 	 * Create a new logger
 	 */
 	constructor() {
-		function selectColor(namespace) {
+		function selectColor(namespace: string) {
 			let hash = 0
 
 			for (let i = 0; i < namespace.length; i++) {
@@ -134,12 +144,12 @@ class LogController {
 		this.logger = this.createLogger('Log/Controller')
 	}
 
-	setLogLevel(level) {
+	setLogLevel(level: string): void {
 		this.winston.level = level
 	}
 
 	/** Create a child logger */
-	createLogger(source) {
+	createLogger(source: string): ChildLogger {
 		return this.winston.child({ source })
 	}
 
@@ -148,7 +158,7 @@ class LogController {
 	 * @param {SocketIO} client - the client socket
 	 * @access public
 	 */
-	clientConnect(client) {
+	clientConnect(client: SocketClient): void {
 		client.onPromise('logs:subscribe', () => {
 			client.join(LogRoom)
 
@@ -158,11 +168,11 @@ class LogController {
 			client.leave(LogRoom)
 		})
 		client.onPromise('logs:clear', () => {
-			this.io.emitToRoom(LogRoom, 'logs:clear')
+			this.io?.emitToRoom(LogRoom, 'logs:clear')
 
 			this.history = []
 
-			this.io.emitToRoom(LogRoom, 'logs:lines', [
+			this.io?.emitToRoom(LogRoom, 'logs:lines', [
 				{
 					time: Date.now(),
 					source: 'log',
@@ -173,7 +183,7 @@ class LogController {
 		})
 	}
 
-	#pendingLines = []
+	#pendingLines: LogLine[] = []
 	debounceSendLines = debounceFn(
 		() => {
 			this.io?.emitToRoom(LogRoom, 'logs:lines', this.#pendingLines)
@@ -191,8 +201,8 @@ class LogController {
 	 * @param {object} line
 	 * @access private
 	 */
-	addToHistory(line) {
-		const uiLine = {
+	addToHistory(line: any) {
+		const uiLine: LogLine = {
 			time: line.timestamp,
 			source: stripAnsi(line.source),
 			level: line.level,
@@ -210,7 +220,7 @@ class LogController {
 		if (typeof this.addBreadcrumb === 'function') {
 			this.addBreadcrumb({
 				category: 'source',
-				level: SentrySeverity[line.level] || SentrySeverity.debug,
+				level: (SentrySeverity as any)[line.level] || SentrySeverity.debug,
 				message: `${line.source}: ${line.message}`,
 			})
 		}
@@ -237,7 +247,7 @@ class LogController {
 	 * @param {Registry} registry
 	 * @access public
 	 */
-	init(registry) {
+	init(registry: Registry) {
 		this.registry = registry
 
 		// Allow the DSN to be provided as an env variable
@@ -287,16 +297,14 @@ class LogController {
 	 * @access protected
 	 * @readonly
 	 */
-	get io() {
-		if (this.registry && this.registry.io) {
-			return this.registry.io
-		}
+	get io(): SocketServerExt | undefined {
+		return this.registry?.io
 	}
 }
 
 // Get this thing started right away!
 // This shouldn't happen here, but some sequencing things with the imports means it does for now
 const logger = new LogController()
-global.logger = logger
+// global.logger = logger
 
 export default logger
