@@ -15,8 +15,23 @@
  *
  */
 
+type FillImageFunction = (key: number, buffer: Buffer) => Promise<void>
+
+interface PendingImage {
+	key: number
+	buffer: Buffer
+}
+
 class ImageWriteQueue {
-	constructor(ipcWapper, fillImage) {
+	private readonly ipcWapper: any // TODO - type
+	private readonly fillImage: FillImageFunction
+
+	private readonly maxConcurrent: number
+
+	private pendingImages: PendingImage[]
+	private inProgress: unknown[]
+
+	constructor(ipcWapper: any, fillImage: FillImageFunction) {
 		this.ipcWapper = ipcWapper
 		this.fillImage = fillImage
 
@@ -26,7 +41,7 @@ class ImageWriteQueue {
 		this.inProgress = []
 	}
 
-	queue(key, buffer) {
+	public queue(key: number, buffer: Buffer): void {
 		let updated = false
 		// Try and replace an existing queued image first
 		for (const img of this.pendingImages) {
@@ -45,7 +60,7 @@ class ImageWriteQueue {
 		this.tryDequeue()
 	}
 
-	tryDequeue() {
+	private tryDequeue(): void {
 		// Start another if not too many in progress
 		if (this.inProgress.length <= this.maxConcurrent && this.pendingImages.length > 0) {
 			// Find first image where key is not being worked on

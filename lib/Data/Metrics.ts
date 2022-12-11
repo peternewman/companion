@@ -20,23 +20,31 @@ import CoreBase from '../Core/Base.js'
 import Registry from '../Registry.js'
 import got from 'got'
 
+interface MetricsPayload {
+	i: string
+	r: number
+	m: number
+	d: string[]
+}
+
 class DataMetrics extends CoreBase {
 	/**
 	 * @param {Registry} registry - the application core
 	 */
-	constructor(registry) {
+	constructor(registry: Registry) {
 		super(registry, 'metrics', 'Data/Metrics')
 	}
 
-	cycle() {
+	private cycle(): void {
 		this.logger.silly('cycle')
 
 		const devices = this.surfaces.getDevicesList().available
 
-		let relevantDevices = []
+		let relevantDevices: string[] = []
 
 		try {
-			Object.values(devices).forEach((device) => {
+			// TODO - any
+			Object.values(devices).forEach((device: any) => {
 				if (device.id !== undefined && !device.id.startsWith('emulator:')) {
 					// remove leading "satellite-" from satellite device serial numbers.
 					const serialNumber = device.id.replace('satellite-', '')
@@ -52,9 +60,9 @@ class DataMetrics extends CoreBase {
 		const instanceCount = this.instance.getInstancesMetrics()
 
 		try {
-			const payload = {
+			const payload: MetricsPayload = {
 				i: this.registry.machineId,
-				r: parseInt(process.uptime()),
+				r: process.uptime(),
 				m: instanceCount,
 				d: relevantDevices,
 			}
@@ -66,18 +74,18 @@ class DataMetrics extends CoreBase {
 		}
 	}
 
-	pushMetrics(payload) {
+	private pushMetrics(payload: MetricsPayload): void {
 		got
 			.post('https://updates.bitfocus.io/companion/metrics', {
 				json: payload,
 				responseType: 'json',
 			})
-			.catch((e) => {
+			.catch(() => {
 				// don't care.
 			})
 	}
 
-	setCycle() {
+	public setCycle(): void {
 		// don't bother with pushing metrics in the startup phase, let's give the system a chance to start up
 		setTimeout(() => this.cycle(), 1000 * 120)
 

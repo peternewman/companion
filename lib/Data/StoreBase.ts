@@ -26,92 +26,78 @@ import Registry from '../Registry.js'
  * develop commercial activities involving the Companion software without
  * disclosing the source code of your own applications.
  */
-class DataStoreBase extends CoreBase {
+class DataStoreBase<TStore> extends CoreBase {
 	/**
 	 * The full backup file path
 	 * @type {string}
 	 * @access protected
 	 */
-	cfgBakFile = ''
+	private readonly cfgBakFile: string
 	/**
 	 * The full corrupt file path
 	 * @type {string}
 	 * @access protected
 	 */
-	cfgCorruptFile = ''
+	private readonly cfgCorruptFile: string
 	/**
 	 * The config directory
 	 * @type {string}
 	 * @access protected
 	 */
-	cfgDir = ''
+	private readonly cfgDir: string
 	/**
 	 * The full main file path
 	 * @type {string}
 	 * @access protected
 	 */
-	cfgFile = ''
+	private readonly cfgFile: string
 	/**
 	 * The full temporary file path
 	 * @type {string}
 	 * @access protected
 	 */
-	cfgTmpFile = ''
+	private readonly cfgTmpFile: string
 	/**
 	 * The stored defaults for a new store
 	 * @type {Object}
 	 * @access protected
 	 */
-	defaults = {}
+	private readonly defaults: Partial<TStore> = {}
 	/**
 	 * Flag to tell the <code>saveInternal</code> there's
 	 * changes to save to disk
-	 * @type {boolean}
-	 * @access protected
 	 */
-	dirty = false
+	private dirty = false
 	/**
 	 * Flag if this database was created fresh on this run
-	 * @type {boolean}
-	 * @access protected
 	 */
-	isFirstRun = false
+	private isFirstRun = false
 	/**
 	 * Timestamp of last save to disk
-	 * @type {number}
-	 * @access protected
 	 */
-	lastsave = Date.now()
+	private lastsave = Date.now()
 	/**
 	 * The name to use for the file and logging
-	 * @type {string}
-	 * @access protected
 	 */
-	name = ''
+	private readonly name: string
 	/**
 	 * The time to use for the save interval
-	 * @type {?number}
-	 * @access protected
 	 */
-	saveCycle
+	private saveCycle: NodeJS.Timeout | undefined
 	/**
 	 * The interval to fire a save to disk when dirty
-	 * @type {?number}
-	 * @access protected
 	 */
-	saveInterval
+	saveInterval: number
 	/**
 	 * Semaphore while the store is saving to disk
-	 * @type {boolean}
-	 * @access protected
 	 */
-	saving = false
+	private saving = false
 	/**
 	 * The flat file DB in RAM
 	 * @type {Object}
 	 * @access protected
 	 */
-	store = {}
+	private store: Partial<TStore> = {}
 
 	/**
 	 * This needs to be called in the extending class
@@ -122,7 +108,7 @@ class DataStoreBase extends CoreBase {
 	 * @param {Object} defaults - the default data to use when making a new file
 	 * @param {string} debug - module path to be used in the debugger
 	 */
-	constructor(registry, name, saveInterval, defaults, debug) {
+	constructor(registry: Registry, name: string, saveInterval: number, defaults: any, debug: string) {
 		super(registry, name, debug)
 
 		this.name = name
@@ -141,8 +127,8 @@ class DataStoreBase extends CoreBase {
 	 * @param {string} key - the key to be delete
 	 * @access public
 	 */
-	deleteKey(key) {
-		this.logger.silly(`${this.name}_del (${key})`)
+	deleteKey(key: keyof TStore): void {
+		this.logger.silly(`${this.name}_del (${String(key)})`)
 		if (key !== undefined) {
 			delete this.store[key]
 			this.setDirty()
@@ -155,7 +141,7 @@ class DataStoreBase extends CoreBase {
 	 * @param {boolean} [withBackup = true] - can be set to <code>false</code> if the current file should not be moved to `FILE.bak`
 	 * @access protected
 	 */
-	async doSave(withBackup) {
+	private async doSave(withBackup: boolean) {
 		const jsonSave = JSON.stringify(this.store)
 		this.dirty = false
 		this.lastsave = Date.now()
@@ -245,11 +231,12 @@ class DataStoreBase extends CoreBase {
 	 * @returns {string} JSON of the database
 	 * @access public
 	 */
-	getJSON() {
+	getJSON(): string | undefined {
 		try {
 			return JSON.stringify(this.store)
 		} catch (e) {
 			this.logger.silly(`JSON error: ${e}`)
+			return undefined
 		}
 	}
 
@@ -260,9 +247,9 @@ class DataStoreBase extends CoreBase {
 	 * @param {boolean} [clone = false] - <code>true</code> if a clone is needed instead of a link
 	 * @access public
 	 */
-	getKey(key, defaultValue, clone = false) {
+	getKey(key: keyof TStore, defaultValue: any, clone = false) {
 		let out
-		this.logger.silly(`${this.name}_get(${key})`)
+		this.logger.silly(`${this.name}_get(${String(key)})`)
 
 		if (this.store[key] === undefined && defaultValue !== undefined) {
 			this.store[key] = defaultValue
@@ -283,7 +270,7 @@ class DataStoreBase extends CoreBase {
 	 * @param {string} key - the key to be checked
 	 * @access public
 	 */
-	hasKey(key) {
+	hasKey(key: keyof TStore) {
 		return this.store[key] !== undefined
 	}
 
@@ -303,7 +290,7 @@ class DataStoreBase extends CoreBase {
 					this.logger.silly('parsed JSON')
 				} else {
 					this.logger.warn(`${this.name} was empty.  Attempting to recover the configuration.`)
-					this.loadBackupSync(this.cfgBakFile)
+					this.loadBackupSync()
 				}
 			} catch (e) {
 				try {
@@ -314,11 +301,11 @@ class DataStoreBase extends CoreBase {
 					this.logger.silly(`${this.name}_load`, `Error making or deleting corrupted backup: ${err}`)
 				}
 
-				this.loadBackupSync(this.cfgBakFile)
+				this.loadBackupSync()
 			}
 		} else if (fs.existsSync(this.cfgBakFile)) {
 			this.logger.warn(`${this.name} is missing.  Attempting to recover the configuration.`)
-			this.loadBackupSync(this.cfgBakFile)
+			this.loadBackupSync()
 		} else {
 			this.logger.silly(this.cfgFile, `doesn't exist. loading defaults`, this.defaults)
 			this.loadDefaults()
@@ -331,7 +318,7 @@ class DataStoreBase extends CoreBase {
 	 * Attempt to load the backup file from disk as a recovery
 	 * @access protected
 	 */
-	loadBackupSync() {
+	private loadBackupSync(): void {
 		if (fs.existsSync(this.cfgBakFile)) {
 			this.logger.silly(this.cfgBakFile, 'exists. trying to read')
 			let data = fs.readFileSync(this.cfgBakFile, 'utf8')
@@ -377,7 +364,7 @@ class DataStoreBase extends CoreBase {
 	 * Save the defaults since a file could not be found/loaded/parses
 	 * @access protected
 	 */
-	loadDefaults() {
+	private loadDefaults(): void {
 		this.store = cloneDeep(this.defaults)
 		this.isFirstRun = true
 		this.save()
@@ -388,7 +375,7 @@ class DataStoreBase extends CoreBase {
 	 * @param {boolean} [withBackup = true] - can be set to `false` if the current file should not be moved to `FILE.bak`
 	 * @access protected
 	 */
-	save(withBackup = true) {
+	private save(withBackup = true): void {
 		if (this.saving === false) {
 			this.logger.silly(`${this.name}_save: begin`)
 			this.saving = true
@@ -412,7 +399,7 @@ class DataStoreBase extends CoreBase {
 	 * Execute a save if the database is dirty
 	 * @access public
 	 */
-	saveImmediate() {
+	saveImmediate(): void {
 		if (this.dirty === true) {
 			this.save()
 		}
@@ -422,7 +409,7 @@ class DataStoreBase extends CoreBase {
 	 * Register that there are changes in the database that need to be saved as soon as possible
 	 * @access protected
 	 */
-	setDirty() {
+	private setDirty(): void {
 		this.dirty = true
 	}
 
@@ -432,8 +419,8 @@ class DataStoreBase extends CoreBase {
 	 * @param {Object} value - the object to save
 	 * @access public
 	 */
-	setKey(key, value) {
-		this.logger.silly(`${this.name}_set(${key}, ${value})`)
+	setKey(key: keyof TStore, value: any): void {
+		this.logger.silly(`${this.name}_set(${String(key)}, ${value})`)
 
 		if (key !== undefined) {
 			if (Array.isArray(key)) {
@@ -442,7 +429,7 @@ class DataStoreBase extends CoreBase {
 					const lastK = key.pop()
 
 					// Find or create the parent object
-					let dbObj = this.store
+					let dbObj: any = this.store
 					for (const k of key) {
 						if (!dbObj || typeof dbObj !== 'object') throw new Error(`Unable to set db path: ${keyStr}`)
 						if (!dbObj[k]) dbObj[k] = {}
@@ -481,7 +468,11 @@ class DataStoreBase extends CoreBase {
 	 * Setup the save cycle interval
 	 * @access protected
 	 */
-	setSaveCycle() {
+	private setSaveCycle() {
+		if (this.saveCycle) {
+			clearInterval(this.saveCycle)
+		}
+
 		this.saveCycle = setInterval(() => {
 			// See if the database is dirty and needs to be saved
 			if (Date.now() - this.lastsave > this.saveInterval && this.dirty) {

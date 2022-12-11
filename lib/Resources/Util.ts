@@ -220,7 +220,7 @@ export function rotateBuffer(buffer: Buffer, rotation: -90 | 180 | 90 | 0): Buff
 	return buffer
 }
 
-export async function showFatalError(title: string, message: string) {
+export async function showFatalError(_title: string, message: string) {
 	// TODO - reimplement this
 	// if (global.electron && global.electron.dialog) {
 	// 	global.electron.dialog.showErrorBox(title, message)
