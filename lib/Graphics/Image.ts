@@ -20,16 +20,25 @@
 import font from '../Resources/Font.js'
 import { PNG } from 'pngjs'
 import { argb, rgb, rgbRev } from '../Resources/Util.js'
+import { ButtonRender } from '../tmp.js'
 // import LogController from '../Log/Controller.js'
 
 // const logger = LogController.createLogger('Graphics/Image')
+
+export type HAlignment = 'left' | 'center' | 'right'
+export type VAlignment = 'top' | 'center' | 'bottom'
 
 class Image {
 	static argb = argb
 	static rgb = rgb
 	static rgbRev = rgbRev
 
-	constructor(width, height) {
+	private lastUpdate = Date.now()
+	private readonly width: number
+	private readonly height: number
+	private readonly canvas: Buffer[]
+
+	constructor(width: number | undefined, height: number | undefined) {
 		/* Defaults for custom images from modules */
 		if (width === undefined) {
 			width = 72
@@ -42,7 +51,6 @@ class Image {
 		this.rgb = rgb.bind(this)
 		this.rgbRev = rgbRev.bind(this)
 
-		this.lastUpdate = Date.now()
 		this.width = width
 		this.height = height
 		this.canvas = []
@@ -53,7 +61,7 @@ class Image {
 		}
 	}
 
-	fillColor(color) {
+	fillColor(color: number) {
 		for (let y = 0; y < this.height; y++) {
 			for (let x = 0; x < this.width; x++) {
 				this.pixel(x, y, color)
@@ -64,11 +72,11 @@ class Image {
 	}
 
 	/** @deprecated use fillColor instead */
-	backgroundColor(backgroundColor) {
+	backgroundColor(backgroundColor: number) {
 		return this.fillColor(backgroundColor)
 	}
 
-	pixel(x, y, color) {
+	pixel(x: number, y: number, color: number) {
 		if (x < 0 || x >= this.width) return
 		if (y < 0 || y >= this.height) return
 
@@ -95,7 +103,7 @@ class Image {
 		return true
 	}
 
-	horizontalLine(y, color) {
+	horizontalLine(y: number, color: number) {
 		for (let x = 0; x < this.width; x++) {
 			this.pixel(x, y, color)
 		}
@@ -103,7 +111,7 @@ class Image {
 		return true
 	}
 
-	verticalLine(x, color) {
+	verticalLine(x: number, color: number) {
 		for (let y = 0; y < this.height; y++) {
 			this.pixel(x, y, color)
 		}
@@ -111,7 +119,7 @@ class Image {
 		return true
 	}
 
-	boxFilled(x1, y1, x2, y2, color) {
+	boxFilled(x1: number, y1: number, x2: number, y2: number, color: number) {
 		for (let y = y1; y <= y2; y++) {
 			for (let x = x1; x <= x2; x++) {
 				this.pixel(x, y, color)
@@ -121,7 +129,7 @@ class Image {
 		return true
 	}
 
-	boxLine(x1, y1, x2, y2, color) {
+	boxLine(x1: number, y1: number, x2: number, y2: number, color: number) {
 		for (let y = y1; y <= y2; y++) {
 			// draw horizontal lines
 			if (y == y1 || y == y2) {
@@ -140,7 +148,15 @@ class Image {
 		return true
 	}
 
-	drawFromPNGdata(data, xStart = 0, yStart = 0, width = 72, height = 58, halign = 'center', valign = 'center') {
+	drawFromPNGdata(
+		data: Buffer,
+		xStart = 0,
+		yStart = 0,
+		width = 72,
+		height = 58,
+		halign: HAlignment = 'center',
+		valign: VAlignment = 'center'
+	) {
 		let png
 		let xouter, xinner, youter, yinner, wouter, houter
 
@@ -252,7 +268,16 @@ class Image {
 		}
 	}
 
-	drawTextLine(x, y, text, color, fontindex, spacing, double, dummy) {
+	drawTextLine(
+		x: number,
+		y: number,
+		text: string | undefined,
+		color: number,
+		fontindex: number,
+		spacing?: number,
+		double?: boolean,
+		dummy?: boolean
+	) {
 		if (text === undefined || text.length == 0) return 0
 
 		if (spacing === undefined) {
@@ -314,10 +339,10 @@ class Image {
 		y = 0,
 		w = 72,
 		h = 72,
-		text,
-		color,
-		fontindex = '',
-		spacing,
+		text: string | undefined,
+		color: number,
+		fontindex: number | 'auto',
+		spacing?: number,
 		size = 1,
 		halign = 'center',
 		valign = 'center',
@@ -336,7 +361,7 @@ class Image {
 		}
 
 		// validate the fontindex
-		fontindex = parseInt(fontindex)
+		fontindex = Number(fontindex)
 		if (!font[fontindex] || isNaN(fontindex)) {
 			fontindex = 'auto'
 		}
@@ -426,7 +451,7 @@ class Image {
 
 		let lines = breakPos.length - 1
 		if (lines * lineheight * (double ? 2 : 1) + (lines - 1) * linespacing * (double ? 2 : 1) > h) {
-			lines = parseInt((h + linespacing * (double ? 2 : 1)) / ((lineheight + linespacing) * (double ? 2 : 1)))
+			lines = Number((h + linespacing * (double ? 2 : 1)) / ((lineheight + linespacing) * (double ? 2 : 1)))
 			textFits = false
 		}
 		if (lines === 0) return true
@@ -443,17 +468,18 @@ class Image {
 					double,
 					true
 				)
-				let xStart, yStart
+				let xStart: number, yStart: number
 
 				switch (halign) {
 					case 'left':
 						xStart = x
 						break
-					case 'center':
-						xStart = x + parseInt((w - xSize) / 2)
-						break
 					case 'right':
 						xStart = x + w - xSize
+						break
+					case 'center':
+					default:
+						xStart = x + Number((w - xSize) / 2)
 						break
 				}
 
@@ -461,16 +487,15 @@ class Image {
 					case 'top':
 						yStart = y + (line - 1) * (lineheight + linespacing) * (double ? 2 : 1)
 						break
-					case 'center':
-						yStart =
-							y +
-							parseInt(
-								(h - (lines * lineheight * (double ? 2 : 1) + (lines - 1) * linespacing * (double ? 2 : 1))) / 2
-							) +
-							(line - 1) * (lineheight + linespacing) * (double ? 2 : 1)
-						break
 					case 'bottom':
 						yStart = y + h - (lines - line + 1) * (lineheight + linespacing) * (double ? 2 : 1)
+						break
+					case 'center':
+					default:
+						yStart =
+							y +
+							Number((h - (lines * lineheight * (double ? 2 : 1) + (lines - 1) * linespacing * (double ? 2 : 1))) / 2) +
+							(line - 1) * (lineheight + linespacing) * (double ? 2 : 1)
 						break
 				}
 
@@ -491,22 +516,29 @@ class Image {
 	 * The buffer data is expected to be RGB or ARGB data, 1 byte per color,
 	 * horizontally. Top left is first three bytes.
 	 */
-	drawPixelBuffer(x, y, width, height, buffer, type) {
-		if (type === undefined && typeof buffer == 'object' && buffer instanceof Buffer) {
-			type = 'buffer'
-		} else if (type === undefined && typeof buffer == 'string') {
-			type = 'base64'
-		}
+	drawPixelBuffer(
+		x: number,
+		y: number,
+		width: number,
+		height: number,
+		buffer0: Uint8Array | Buffer | string,
+		type?: 'buffer' | 'base64'
+	) {
+		let buffer: Buffer
 
-		if (type === 'base64') {
-			buffer = Buffer.from(buffer, 'base64')
-		} else if (!Buffer.isBuffer(buffer) && buffer instanceof Uint8Array) {
-			buffer = Buffer.from(buffer.buffer, buffer.byteOffset, buffer.byteLength)
+		if (type === 'buffer' || (type === undefined && typeof buffer0 == 'object' && buffer0 instanceof Buffer)) {
+			buffer = buffer0 as Buffer
+		} else if (type === 'base64' || (type === undefined && typeof buffer0 == 'string')) {
+			buffer = Buffer.from(buffer0.toString(), 'base64')
+		} else if (!Buffer.isBuffer(buffer0) && buffer0 instanceof Uint8Array) {
+			buffer = Buffer.from(buffer0.buffer, buffer0.byteOffset, buffer0.byteLength)
+		} else {
+			throw new Error('Pixelbuffer of unknown type provided')
 		}
 
 		if (buffer.length < width * height * 3) {
 			throw new Error(
-				'Pixelbuffer of ' + buffer.length + ' bytes is less than expected ' + width * height * 3 + ' bytes'
+				'Pixelbuffer of ' + buffer0.length + ' bytes is less than expected ' + width * height * 3 + ' bytes'
 			)
 		}
 
@@ -548,7 +580,15 @@ class Image {
 		}
 	}
 
-	drawChar(x, y, char, color, fontindex, double, dummy) {
+	drawChar(
+		x: number,
+		y: number,
+		char: number,
+		color: number,
+		fontindex?: number | 'auto',
+		double?: boolean,
+		dummy?: boolean
+	): number {
 		if (double === undefined) double = false
 		if (char === undefined) return 0
 
@@ -573,6 +613,34 @@ class Image {
 		}
 
 		let gfx = font[fontindex][char]
+
+		return this.drawCharDefinition(x, y, gfx, color, double, dummy)
+	}
+
+	drawIcon(x: number, y: number, icon: keyof font.icon, color: number, double?: boolean, dummy?: boolean): number {
+		if (double === undefined) double = false
+		if (icon === undefined) return 0
+
+		// dummy is for not drawing any actual pixels. just calculate the font size
+		if (dummy === undefined) dummy = false
+
+		if (icon == 32 || icon == 160) return 2 // return blanks for space
+
+		if (font.icon[icon] === undefined) {
+			// logger.verbose(
+			// 	'trying to draw a character that doesnt exist in the font:',
+			// 	char,
+			// 	String.fromCharCode(parseInt(char))
+			// )
+			return 0
+		}
+
+		let gfx = font.icon[icon]
+
+		return this.drawCharDefinition(x, y, gfx, color, double, dummy)
+	}
+
+	private drawCharDefinition(x: number, y: number, gfx: any, color: number, double?: boolean, dummy?: boolean): number {
 		let maxX = 0
 
 		for (let pixel in gfx) {
@@ -599,7 +667,7 @@ class Image {
 		return maxX
 	}
 
-	drawBorder(depth = 0, color) {
+	drawBorder(depth = 0, color: number): boolean {
 		if (depth > 0) {
 			if (depth * 2 < this.width) {
 				for (let x = 0; x < depth; x++) {
@@ -640,7 +708,7 @@ class Image {
 		}
 	}
 
-	drawCornerTriangle(depth = 0, color, halign = 'left', valign = 'top') {
+	drawCornerTriangle(depth = 0, color: number, halign = 'left', valign = 'top'): boolean {
 		if (depth > 0 && (halign == 'left' || halign == 'right') && (valign == 'top' || valign == 'bottom')) {
 			let maxY = depth > this.height ? this.height : depth
 
@@ -660,19 +728,19 @@ class Image {
 		}
 	}
 
-	toBase64() {
+	toBase64(): string {
 		return this.buffer().toString('base64')
 	}
 
-	buffer() {
+	buffer(): Buffer {
 		return Buffer.concat(this.canvas)
 	}
 
-	bufferAndTime() {
+	bufferAndTime(): ButtonRender {
 		return { updated: this.lastUpdate, buffer: this.buffer() }
 	}
 
-	static emptyAndTime() {
+	static emptyAndTime(): ButtonRender {
 		return { updated: Date.now(), buffer: Buffer.alloc(72 * 72 * 3) }
 	}
 }

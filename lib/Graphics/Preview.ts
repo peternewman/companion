@@ -1,12 +1,14 @@
 import { CreateBankControlId } from '../Shared/ControlId.js'
 import CoreBase from '../Core/Base.js'
-import Registry from '../Registry.js'
+import type Registry from '../Registry.js'
 import { ControlConfigRoom } from '../Controls/ControlBase.js'
+import type { ButtonRender, SocketClient } from '../tmp.js'
+import { MAX_BUTTONS } from '../Resources/Constants.js'
 
-function PreviewPageRoom(page) {
+function PreviewPageRoom(page: number) {
 	return `preview:page:${page}`
 }
-function PreviewBankRoom(page, bank) {
+function PreviewBankRoom(page: number, bank: number) {
 	return `preview:bank:${page}.${bank}`
 }
 
@@ -35,7 +37,7 @@ class GraphicsPreview extends CoreBase {
 	/**
 	 * @param {Registry} registry - the application core
 	 */
-	constructor(registry) {
+	constructor(registry: Registry) {
 		super(registry, 'preview', 'Graphics/Preview')
 
 		this.graphics.on('bank_invalidated', this.updateBank.bind(this))
@@ -46,27 +48,27 @@ class GraphicsPreview extends CoreBase {
 	 * @param {Socket} client - the client connection
 	 * @access public
 	 */
-	clientConnect(client) {
-		client.onPromise('preview:page:subscribe', (page) => {
+	clientConnect(client: SocketClient) {
+		client.onPromise('preview:page:subscribe', (page: number) => {
 			client.join(PreviewPageRoom(page))
 
-			const renders = {}
-			for (let i = 1; i <= global.MAX_BUTTONS; ++i) {
+			const renders: Record<number, Buffer> = {}
+			for (let i = 1; i <= MAX_BUTTONS; ++i) {
 				renders[i] = this.graphics.getBank(page, i).buffer
 			}
 
 			return renders
 		})
-		client.onPromise('preview:page:unsubscribe', (page) => {
+		client.onPromise('preview:page:unsubscribe', (page: number) => {
 			client.leave(PreviewPageRoom(page))
 		})
 
-		client.onPromise('preview:bank:subscribe', (page, bank) => {
+		client.onPromise('preview:bank:subscribe', (page: number, bank: number) => {
 			client.join(PreviewBankRoom(page, bank))
 
 			return this.graphics.getBank(page, bank).buffer
 		})
-		client.onPromise('preview:bank:unsubscribe', (page, bank) => {
+		client.onPromise('preview:bank:unsubscribe', (page: number, bank: number) => {
 			client.leave(PreviewBankRoom(page, bank))
 		})
 	}
@@ -77,7 +79,7 @@ class GraphicsPreview extends CoreBase {
 	 * @param {number} bank - the bank number
 	 * @access public
 	 */
-	updateBank(page, bank, render) {
+	updateBank(page: number, bank: number, render: ButtonRender) {
 		// Push the updated render to any clients viewing a preview of a control
 		const controlId = CreateBankControlId(page, bank)
 		const controlRoom = ControlConfigRoom(controlId)

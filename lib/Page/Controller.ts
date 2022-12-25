@@ -1,8 +1,13 @@
 import { cloneDeep } from 'lodash-es'
 import CoreBase from '../Core/Base.js'
-import Registry from '../Registry.js'
+import type Registry from '../Registry.js'
+import { SocketClient } from '../tmp.js'
 
 const PagesRoom = 'pages'
+
+export interface PageInfo {
+	name: string
+}
 
 /**
  * The class that manages the user pages
@@ -26,15 +31,16 @@ const PagesRoom = 'pages'
  * disclosing the source code of your own applications.
  */
 class PageController extends CoreBase {
+	private pages: Record<number, PageInfo | undefined>
+
 	/**
 	 * @param {Registry} registry - the application core
 	 */
-	constructor(registry) {
+	constructor(registry: Registry) {
 		super(registry, 'page', 'Page/Controller')
 
 		this.pages = this.db.getKey('page')
-
-		this.setupPages()
+		this.pages = this.setupPages(this.pages)
 	}
 
 	/**
@@ -42,8 +48,8 @@ class PageController extends CoreBase {
 	 * @param {SocketIO} client - the client socket
 	 * @access public
 	 */
-	clientConnect(client) {
-		client.onPromise('pages:set-name', (page, name) => {
+	clientConnect(client: SocketClient) {
+		client.onPromise('pages:set-name', (page: number, name: string) => {
 			this.logger.silly(`socket: pages:set-name ${page}: ${name}`)
 
 			const existingData = this.pages[page]
@@ -94,7 +100,7 @@ class PageController extends CoreBase {
 	 * @returns the requested page
 	 * @access public
 	 */
-	getPage(page, clone = false) {
+	getPage(page: number, clone = false): PageInfo | undefined {
 		let out
 
 		if (this.pages[page] !== undefined) {
@@ -114,14 +120,13 @@ class PageController extends CoreBase {
 	 * @returns {string} the page's name
 	 * @access public
 	 */
-	getPageName(page) {
-		let out = ''
-
-		if (this.pages[page] !== undefined && this.pages[page].name !== undefined) {
-			out = this.pages[page].name
+	getPageName(page: number): string {
+		const pageInfo = this.pages[page]
+		if (pageInfo && pageInfo.name !== undefined) {
+			return pageInfo.name
+		} else {
+			return ''
 		}
-
-		return out
 	}
 
 	/**
@@ -131,7 +136,7 @@ class PageController extends CoreBase {
 	 * @param {boolean} [clone = false] - <code>true</code> if the graphics should invalidate
 	 * @access public
 	 */
-	setPage(page, value, redraw = true) {
+	setPage(page: number, value, redraw = true) {
 		if (!value) value = { name: 'PAGE' }
 
 		this.logger.silly('Set page ' + page + ' to ', value)
@@ -151,21 +156,23 @@ class PageController extends CoreBase {
 	 * Load the page table with defaults
 	 * @access protected
 	 */
-	setupPages() {
+	private setupPages(pages: Record<number, PageInfo | undefined> | undefined) {
 		// Default values
-		if (this.pages === undefined) {
-			this.pages = {}
+		if (pages === undefined) {
+			pages = {}
 
 			for (let n = 1; n <= 99; n++) {
-				if (this.pages['' + n] === undefined) {
-					this.pages['' + n] = {
+				if (pages[n] === undefined) {
+					pages[n] = {
 						name: 'PAGE',
 					}
 				}
 			}
 
-			this.db.setKey('page', this.pages)
+			this.db.setKey('page', pages)
 		}
+
+		return pages
 	}
 }
 

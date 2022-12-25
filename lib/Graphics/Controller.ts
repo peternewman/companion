@@ -15,18 +15,26 @@
  *
  */
 
-import GraphicsRenderer from './Renderer.js'
+import GraphicsRenderer, { GraphicsDrawOptions } from './Renderer.js'
 import CoreBase from '../Core/Base.js'
 import { CreateBankControlId, ParseControlId } from '../Shared/ControlId.js'
+import type Registry from '../Registry.js'
+import { ButtonRender } from '../tmp.js'
+import { MAX_BUTTONS } from '../Resources/Constants.js'
 
 class GraphicsController extends CoreBase {
-	constructor(registry) {
+	private readonly draw_options: GraphicsDrawOptions
+	private readonly renders: Record<string, ButtonRender>
+
+	private pincodebuffers: Record<string, ButtonRender> | undefined
+
+	constructor(registry: Registry) {
 		super(registry, 'graphics', 'Graphics/Controller')
 
 		this.draw_options = {
-			page_direction_flipped: this.userconfig.getKey('page_direction_flipped'),
-			page_plusminus: this.userconfig.getKey('page_plusminus'),
-			remove_topbar: this.userconfig.getKey('remove_topbar'),
+			page_direction_flipped: !!this.userconfig.getKey('page_direction_flipped'),
+			page_plusminus: !!this.userconfig.getKey('page_plusminus'),
+			remove_topbar: !!this.userconfig.getKey('remove_topbar'),
 		}
 
 		this.renders = {}
@@ -35,9 +43,9 @@ class GraphicsController extends CoreBase {
 	/**
 	 * Redraw the page controls on every page
 	 */
-	invalidatePageControls() {
+	invalidatePageControls(): void {
 		for (let page = 1; page <= 99; page++) {
-			for (let bank = 1; bank <= global.MAX_BUTTONS; bank++) {
+			for (let bank = 1; bank <= MAX_BUTTONS; bank++) {
 				const style = this.renders[page + '_' + bank]?.style
 				if (style == 'pageup' || style == 'pagedown') {
 					this.invalidateBank(page, bank)
@@ -49,9 +57,9 @@ class GraphicsController extends CoreBase {
 	 * Redraw the page number control on the specified page
 	 * @param {number} page
 	 */
-	invalidatePageNumberControls(page) {
+	invalidatePageNumberControls(page: number): void {
 		if (page) {
-			for (let bank = 1; bank <= global.MAX_BUTTONS; bank++) {
+			for (let bank = 1; bank <= MAX_BUTTONS; bank++) {
 				const style = this.renders[page + '_' + bank]?.style
 				if (style == 'pagenum') {
 					this.invalidateBank(page, bank)
@@ -64,7 +72,7 @@ class GraphicsController extends CoreBase {
 	 * Draw a preview of a bank
 	 * @param {object} bankConfig
 	 */
-	drawPreview(bankConfig) {
+	drawPreview(bankConfig): ButtonRender {
 		return GraphicsRenderer.drawBankImage(this.draw_options, bankConfig)
 	}
 
@@ -74,15 +82,15 @@ class GraphicsController extends CoreBase {
 	 * @param {(boolean|number|string)} value - the saved value
 	 * @access public
 	 */
-	updateUserConfig(key, value) {
+	updateUserConfig(key: string, value: unknown): void {
 		if (key == 'page_direction_flipped') {
-			this.draw_options.page_direction_flipped = value
+			this.draw_options.page_direction_flipped = !!value
 			this.invalidatePageControls()
 		} else if (key == 'page_plusminus') {
-			this.draw_options.page_plusminus = value
+			this.draw_options.page_plusminus = !!value
 			this.invalidatePageControls()
 		} else if (key == 'remove_topbar') {
-			this.draw_options.remove_topbar = value
+			this.draw_options.remove_topbar = !!value
 			this.logger.silly('Topbar removed')
 			// Delay redrawing to give instances a chance to adjust
 			setTimeout(() => {
@@ -92,14 +100,14 @@ class GraphicsController extends CoreBase {
 		}
 	}
 
-	invalidateControl(controlId) {
+	invalidateControl(controlId: string): void {
 		const parsed = ParseControlId(controlId)
 		if (parsed?.type === 'bank') {
 			this.invalidateBank(parsed.page, parsed.bank)
 		}
 	}
 
-	invalidateBank(page, bank) {
+	invalidateBank(page: number, bank: number): void {
 		const render = this.#drawAndCacheBank(page, bank)
 
 		this.emit('bank_invalidated', page, bank, render)
@@ -110,9 +118,9 @@ class GraphicsController extends CoreBase {
 	 * @param {boolean} invalidate whether to report invalidations of each bank
 	 * @access private
 	 */
-	regenerateAll(invalidate) {
+	regenerateAll(invalidate: boolean): void {
 		for (let page = 1; page <= 99; page++) {
-			for (let bank = 1; bank <= global.MAX_BUTTONS; ++bank) {
+			for (let bank = 1; bank <= MAX_BUTTONS; ++bank) {
 				const render = this.#drawAndCacheBank(page, bank)
 
 				if (invalidate) {
@@ -124,9 +132,9 @@ class GraphicsController extends CoreBase {
 		this.emit('all_invalidated')
 	}
 
-	#drawAndCacheBank(page, bank) {
-		page = parseInt(page)
-		bank = parseInt(bank)
+	#drawAndCacheBank(page: number, bank: number): ButtonRender {
+		page = Number(page)
+		bank = Number(bank)
 
 		const imageId = page !== undefined && bank !== undefined ? `${page}_${bank}` : undefined
 
@@ -136,19 +144,24 @@ class GraphicsController extends CoreBase {
 			const pagename = page !== undefined ? this.page.getPageName(page) : undefined
 
 			const render = GraphicsRenderer.drawBankImage(this.draw_options, buttonStyle, page, bank, pagename)
-			this.renders[imageId] = render
+
+			if (imageId !== undefined) {
+				this.renders[imageId] = render
+			}
 
 			return render
 		} else {
 			const render = GraphicsRenderer.drawBlank(this.draw_options, page, bank)
 
-			this.renders[imageId] = render
+			if (imageId !== undefined) {
+				this.renders[imageId] = render
+			}
 
 			return render
 		}
 	}
 
-	getImagesForPincode(pincode) {
+	getImagesForPincode(pincode: string | undefined) {
 		if (!this.pincodebuffers) {
 			this.pincodebuffers = {}
 
@@ -163,7 +176,7 @@ class GraphicsController extends CoreBase {
 		}
 	}
 
-	getBank(page, bank) {
+	getBank(page: number, bank: number): ButtonRender {
 		let render = this.renders[page + '_' + bank]
 		if (render) return render
 

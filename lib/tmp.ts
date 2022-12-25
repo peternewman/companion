@@ -39,3 +39,8 @@ export interface SocketServerExt extends Server {
 export interface ButtonStyle {
 	show_topbar: boolean | 'default' | undefined
 }
+
+export interface ButtonRender {
+	buffer: Buffer
+	style: any // TODO
+}
