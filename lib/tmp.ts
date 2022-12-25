@@ -41,6 +41,7 @@ export interface ButtonStyle {
 }
 
 export interface ButtonRender {
+	updated: number
 	buffer: Buffer
-	style: any // TODO
+	style?: any // TODO
 }

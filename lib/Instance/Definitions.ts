@@ -3,6 +3,8 @@ import { nanoid } from 'nanoid'
 import CoreBase from '../Core/Base.js'
 import { CreateBankControlId } from '../Shared/ControlId.js'
 import { EventDefinitions } from '../Resources/EventDefinitions.js'
+import type Registry from '../Registry.js'
+import { SocketClient } from '../tmp.js'
 
 const PresetsRoom = 'presets'
 const ActionsRoom = 'action-definitions'
@@ -53,7 +55,7 @@ class InstanceDefinitions extends CoreBase {
 	/**
 	 * @param {Registry} registry - the application core
 	 */
-	constructor(registry) {
+	constructor(registry: Registry) {
 		super(registry, 'definitions', 'Instance/Definitions')
 	}
 
@@ -62,7 +64,7 @@ class InstanceDefinitions extends CoreBase {
 	 * @param {SocketIO} client - the client socket
 	 * @access public
 	 */
-	clientConnect(client) {
+	clientConnect(client: SocketClient) {
 		client.onPromise('presets:subscribe', () => {
 			client.join(PresetsRoom)
 
@@ -103,7 +105,7 @@ class InstanceDefinitions extends CoreBase {
 
 		client.onPromise('presets:import_to_bank', this.importPresetToBank.bind(this))
 
-		client.onPromise('presets:preview_render', (instance_id, preset_id) => {
+		client.onPromise('presets:preview_render', (instance_id: string, preset_id: string) => {
 			const definition = this.#presetDefinitions[instance_id]?.[preset_id]
 			if (definition) {
 				const style = {
@@ -151,7 +153,7 @@ class InstanceDefinitions extends CoreBase {
 	 * @param {string} actionId - the id of the action
 	 * @access public
 	 */
-	createActionItem(instanceId, actionId) {
+	createActionItem(instanceId: string, actionId: string) {
 		const definition = this.getActionDefinition(instanceId, actionId)
 		if (definition) {
 			const action = {

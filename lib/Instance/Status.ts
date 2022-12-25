@@ -1,6 +1,21 @@
 import jsonPatch from 'fast-json-patch'
 import { isEqual } from 'lodash-es'
 import CoreBase from '../Core/Base.js'
+import type { SocketClient } from '../tmp.js'
+import type Registry from '../Registry.js'
+import type { InstanceStatus as ModuleStatusLevel } from '@companion-module/base'
+
+export enum InstanceStatusCategory {
+	Error = 'error',
+	Warning = 'warning',
+	Good = 'good',
+}
+
+export interface InstanceStatus {
+	category: InstanceStatusCategory | null
+	level: ModuleStatusLevel | 'crashed' | null
+	message: string | undefined
+}
 
 class Status extends CoreBase {
 	/**
@@ -8,9 +23,9 @@ class Status extends CoreBase {
 	 * levels: null = unknown, see updateInstanceStatus for possible values
 	 * @access private
 	 */
-	#instanceStatuses = {}
+	#instanceStatuses: Record<string, InstanceStatus | undefined> = {}
 
-	constructor(registry) {
+	constructor(registry: Registry) {
 		super(registry, 'instance', 'Instance/Status')
 	}
 
@@ -19,7 +34,7 @@ class Status extends CoreBase {
 	 * @param {SocketIO} client - the client socket
 	 * @access public
 	 */
-	clientConnect(client) {
+	clientConnect(client: SocketClient) {
 		client.onPromise('instance_status:get', () => {
 			return this.#instanceStatuses
 		})
@@ -31,27 +46,31 @@ class Status extends CoreBase {
 	 * @param {number | null} level
 	 * @param {String | null} msg
 	 */
-	updateInstanceStatus(instance_id, level, msg) {
-		let category = 'warning'
+	updateInstanceStatus(
+		instance_id: string,
+		level: ModuleStatusLevel | 'crashed' | null,
+		msg: string | undefined | null
+	) {
+		let category: InstanceStatusCategory | null = InstanceStatusCategory.Warning
 
 		switch (level) {
 			case null:
 				category = null
 				break
 			case 'ok':
-				category = 'good'
+				category = InstanceStatusCategory.Good
 				break
 			case 'connecting':
 			case 'disconnected':
 			case 'connection_failure':
 			case 'crashed':
 			case 'unknown_error':
-				category = 'error'
+				category = InstanceStatusCategory.Error
 				break
 			case 'bad_config':
 			case 'unknown_warning':
 			default:
-				category = 'warning'
+				category = InstanceStatusCategory.Warning
 				break
 		}
 
@@ -76,18 +95,18 @@ class Status extends CoreBase {
 	 * @param {String} instance_id
 	 * @returns {object} ??
 	 */
-	getInstanceStatus(instance_id) {
+	getInstanceStatus(instance_id: string) {
 		return this.#instanceStatuses[instance_id]
 	}
 
-	forgetInstanceStatus(instance_id) {
+	forgetInstanceStatus(instance_id: string) {
 		const newStatuses = { ...this.#instanceStatuses }
 		delete newStatuses[instance_id]
 
 		this.#setStatuses(newStatuses)
 	}
 
-	#setStatuses(newObj) {
+	#setStatuses(newObj: Record<string, InstanceStatus | undefined>) {
 		const patch = jsonPatch.compare(this.#instanceStatuses || {}, newObj || {})
 		if (patch.length > 0) {
 			// TODO - make this be a subscription with a dedicated room
