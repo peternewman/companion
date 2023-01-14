@@ -1,4 +1,10 @@
+// import type { SomeCompanionActionInputField } from '@companion-module/base'
 import moment from 'moment'
+
+export interface EventDefinition {
+	name: string
+	options: unknown[]
+}
 
 /**
  * Definitions for the trigger event types
@@ -21,7 +27,7 @@ import moment from 'moment'
  * develop commercial activities involving the Companion software without
  * disclosing the source code of your own applications.
  */
-export const EventDefinitions = {
+export const EventDefinitions: Record<string, EventDefinition> = {
 	interval: {
 		name: 'Time Interval',
 		options: [

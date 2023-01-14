@@ -1,4 +1,18 @@
 import moment from 'moment'
+import type { ChildLogger } from '../../../../Log/Controller'
+import type { Registry, TriggerEventInstance } from '../../../../tmp'
+import type TriggerEvents from '../../../TriggerEvents'
+
+interface IntervalEvent {
+	id: string
+	period: number
+	lastExecute: number
+}
+interface TimeOfDayEvent {
+	id: string
+	time: never
+	nextExecute: number | null
+}
 
 /**
  * This is the runner for time based trigger events
@@ -26,51 +40,56 @@ export default class TriggersEventTimer {
 	 * @type {boolean}
 	 * @access private
 	 */
-	#enabled = false
+	#enabled: boolean = false
 
 	/**
 	 * Shared event bus, across all triggers
 	 * @type {EventEmitter}
 	 * @access private
 	 */
-	#eventBus
+	#eventBus: TriggerEvents
 
 	/**
 	 * Execute the actions of the parent trigger
 	 * @type {Function}
 	 * @access private
 	 */
-	#executeActions
+	#executeActions: (nowTime: number) => void
 
 	/**
 	 * Enabled time interval events
 	 * @type {Array}
 	 * @access private
 	 */
-	#intervalEvents = []
+	#intervalEvents: IntervalEvent[] = []
 
 	/**
 	 * The last tick received from the clock
 	 * @type {number}
 	 * @access private
 	 */
-	#lastTick
+	#lastTick: number
 
 	/**
 	 * The logger for this class
 	 * @type {winston.Logger}
 	 * @access protected
 	 */
-	logger
+	logger: ChildLogger
 
 	/**
 	 * Enabled time of day events
 	 * @type {Array}
 	 * @access private
 	 */
-	#timeOfDayEvents = []
+	#timeOfDayEvents: TimeOfDayEvent[] = []
 
-	constructor(registry, eventBus, controlId, executeActions) {
+	constructor(
+		registry: Registry,
+		eventBus: TriggerEvents,
+		controlId: string,
+		executeActions: (nowTime: number) => void
+	) {
 		this.logger = registry.log.createLogger(`Controls/Triggers/Events/Timer/${controlId}`)
 
 		this.#eventBus = eventBus
@@ -93,7 +112,7 @@ export default class TriggersEventTimer {
 	 * @param {Object} event Event to describe
 	 * @returns
 	 */
-	getIntervalDescription(event) {
+	getIntervalDescription(event: TriggerEventInstance) {
 		let time = `${event.options.seconds} seconds`
 		if (event.options.seconds >= 3600) {
 			time = `${Math.floor(event.options.seconds / 3600)} hours`
@@ -109,7 +128,7 @@ export default class TriggersEventTimer {
 	 * @param {Object} time - time details for timeofday event
 	 * @returns
 	 */
-	#getNextExecuteTime(time) {
+	#getNextExecuteTime(time): number | null {
 		if (typeof time.time !== 'string' || !Array.isArray(time.days) || !time.days.length) return null
 
 		const timeMatch = time.time.match(/^(0[0-9]|1[0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])$/i)
@@ -156,7 +175,7 @@ export default class TriggersEventTimer {
 	 * @param {Object} event Event to describe
 	 * @returns
 	 */
-	getTimeOfDayDescription(event) {
+	getTimeOfDayDescription(event: TriggerEventInstance) {
 		let day_str = 'Unknown'
 		if (event.options.days) {
 			const days = [...event.options.days].sort()
@@ -186,7 +205,7 @@ export default class TriggersEventTimer {
 	 * @param {number} nowTime Current wall time of the event
 	 * @access private
 	 */
-	#onTick = (tickSeconds, nowTime) => {
+	#onTick = (tickSeconds: number, nowTime: number) => {
 		if (this.#enabled) {
 			let execute = false
 
@@ -210,7 +229,7 @@ export default class TriggersEventTimer {
 				setImmediate(() => {
 					try {
 						this.#executeActions(nowTime)
-					} catch (e) {
+					} catch (e: any) {
 						this.logger.warn(`Execute actions failed: ${e?.toString?.() ?? e?.message ?? e}`)
 					}
 				})
@@ -223,7 +242,7 @@ export default class TriggersEventTimer {
 	 * Set whether the events are enabled
 	 * @param {boolean} enabled
 	 */
-	setEnabled(enabled) {
+	setEnabled(enabled: boolean) {
 		if (!this.#enabled && enabled) {
 			// Reset all the intervals, to be based from the next tick
 			for (const interval of this.#intervalEvents) {
@@ -239,7 +258,7 @@ export default class TriggersEventTimer {
 	 * @param {string} id Id of the event
 	 * @param {boolean} period Time interval of the trigger (in seconds)
 	 */
-	setInterval(id, period) {
+	setInterval(id: string, period: number) {
 		this.clearInterval(id)
 
 		if (period && period > 0) {
@@ -255,7 +274,7 @@ export default class TriggersEventTimer {
 	 * Remove an interval event listener
 	 * @param {string} id Id of the event
 	 */
-	clearInterval(id) {
+	clearInterval(id: string) {
 		this.#intervalEvents = this.#intervalEvents.filter((int) => int.id !== id)
 	}
 
@@ -264,7 +283,7 @@ export default class TriggersEventTimer {
 	 * @param {string} id Id of the event
 	 * @param {boolean} time time details
 	 */
-	setTimeOfDay(id, time) {
+	setTimeOfDay(id: string, time) {
 		this.clearTimeOfDay(id)
 
 		this.#timeOfDayEvents.push({
@@ -278,7 +297,7 @@ export default class TriggersEventTimer {
 	 * Remove a timeofday event listener
 	 * @param {string} id Id of the event
 	 */
-	clearTimeOfDay(id) {
+	clearTimeOfDay(id: string) {
 		this.#timeOfDayEvents = this.#timeOfDayEvents.filter((tod) => tod.id !== id)
 	}
 }

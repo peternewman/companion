@@ -8,15 +8,15 @@ export function argb(
 	g: string | number,
 	b: string | number,
 	base = 10
-): number | false {
+): number {
 	a = parseInt(a as any, base)
 	r = parseInt(r as any, base)
 	g = parseInt(g as any, base)
 	b = parseInt(b as any, base)
 
-	if (isNaN(a) || isNaN(r) || isNaN(g) || isNaN(b)) return false
+	if (isNaN(a) || isNaN(r) || isNaN(g) || isNaN(b)) return false as any // TODO HACK
 	const rgbVal = rgb(r, g, b)
-	if (rgbVal === false) return false
+	if ((rgbVal as any) === false) return false as any // TODO HACK
 
 	return (
 		a * 0x1000000 + rgbVal // bitwise doesn't work because JS bitwise is working with 32bit signed int
@@ -31,12 +31,12 @@ export function decimalToRgb(decimal: number): { red: number; green: number; blu
 	}
 }
 
-export function rgb(r: number | string, g: number | string, b: number | string, base = 10): number | false {
+export function rgb(r: number | string, g: number | string, b: number | string, base = 10): number {
 	r = parseInt(r as any, base)
 	g = parseInt(g as any, base)
 	b = parseInt(b as any, base)
 
-	if (isNaN(r) || isNaN(g) || isNaN(b)) return false
+	if (isNaN(r) || isNaN(g) || isNaN(b)) return false as any // TODO HACK
 	return ((r & 0xff) << 16) | ((g & 0xff) << 8) | (b & 0xff)
 }
 

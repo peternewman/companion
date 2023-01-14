@@ -4,11 +4,86 @@ import CoreBase from '../Core/Base.js'
 import { CreateBankControlId } from '../Shared/ControlId.js'
 import { EventDefinitions } from '../Resources/EventDefinitions.js'
 import type Registry from '../Registry.js'
-import { SocketClient } from '../tmp.js'
+import { ActionInstance, Complete, FeedbackInstance, SocketClient, TriggerEventInstance } from '../tmp.js'
+import {
+	CompanionButtonPresetOptions,
+	CompanionButtonStyleProps,
+	CompanionFeedbackButtonStyleResult,
+	CompanionPresetAction,
+	CompanionButtonPresetDefinition as ModulePresetDefinition,
+} from '@companion-module/base'
 
 const PresetsRoom = 'presets'
 const ActionsRoom = 'action-definitions'
 const FeedbacksRoom = 'feedback-definitions'
+
+export interface FeedbackDefinition {
+	label: string
+	description?: string
+	options: Array<unknown>
+	type: string
+	style: unknown
+}
+export interface ActionDefinition {
+	label: string
+	description?: string
+	options: Array<unknown>
+}
+export interface ButtonPresetDefinition {
+	id: string
+	category: string
+	name: string
+	type: 'button'
+	style: CompanionButtonStyleProps
+	/** Options for this preset */
+	options?: CompanionButtonPresetOptions
+	/** The feedbacks on the button */
+	feedbacks: PresetFeedback[]
+	steps: ButtonPresetStepActions[]
+}
+export interface PresetFeedback {
+	/** The id of the feedback definition */
+	type: string
+	/** The option values for the action */
+	options: Record<string, any>
+	/**
+	 * If a boolean feedback, the style effect of the feedback
+	 */
+	style?: CompanionFeedbackButtonStyleResult
+}
+export interface ButtonPresetStepActions {
+	/** The button down actions */
+	down: PresetAction[]
+	/** The button up actions */
+	up: PresetAction[]
+	rotate_left?: PresetAction[]
+	rotate_right?: PresetAction[]
+}
+export interface PresetAction {
+	/** The id of the action definition */
+	action: string
+	/** The execution delay of the action */
+	delay?: number
+	/** The option values for the action */
+	options: Record<string, any>
+}
+
+export interface UIPreset {
+	id: string
+	label: string
+	category: string
+}
+
+function convertPresetActions(actions: CompanionPresetAction[]): PresetAction[] {
+	return actions?.map(
+		(act) =>
+			({
+				action: act.actionId,
+				options: act.options,
+				delay: act.delay,
+			} satisfies Complete<PresetAction>)
+	)
+}
 
 /**
  * Class to handle and store the 'definitions' produced by instances.
@@ -38,19 +113,19 @@ class InstanceDefinitions extends CoreBase {
 	 * @type {Object}
 	 * @access private
 	 */
-	#actionDefinitions = {}
+	#actionDefinitions: Record<string, Record<string, ActionDefinition>> = {}
 	/**
 	 * The feedback definitions
 	 * @type {Object}
 	 * @access protected
 	 */
-	#feedbackDefinitions = {}
+	#feedbackDefinitions: Record<string, Record<string, FeedbackDefinition>> = {}
 	/**
 	 * The preset definitions
 	 * @type {Object}
 	 * @access protected
 	 */
-	#presetDefinitions = {}
+	#presetDefinitions: Record<string, Record<string, ButtonPresetDefinition>> = {}
 
 	/**
 	 * @param {Registry} registry - the application core
@@ -68,7 +143,7 @@ class InstanceDefinitions extends CoreBase {
 		client.onPromise('presets:subscribe', () => {
 			client.join(PresetsRoom)
 
-			const result = {}
+			const result: Record<string, Record<string, UIPreset>> = {}
 			for (const [id, presets] of Object.entries(this.#presetDefinitions)) {
 				if (Object.keys(presets).length > 0) {
 					result[id] = this.#simplifyPresetsForUi(presets)
@@ -105,8 +180,8 @@ class InstanceDefinitions extends CoreBase {
 
 		client.onPromise('presets:import_to_bank', this.importPresetToBank.bind(this))
 
-		client.onPromise('presets:preview_render', (instance_id: string, preset_id: string) => {
-			const definition = this.#presetDefinitions[instance_id]?.[preset_id]
+		client.onPromise('presets:preview_render', (instanceId: string, preset_id: string) => {
+			const definition = this.#presetDefinitions[instanceId]?.[preset_id]
 			if (definition) {
 				const style = {
 					...definition.style,
@@ -129,7 +204,7 @@ class InstanceDefinitions extends CoreBase {
 		client.onPromise('action-definitions:create-item', this.createActionItem.bind(this))
 		client.onPromise('feedback-definitions:create-item', this.createFeedbackItem.bind(this))
 
-		client.onPromise('action-definitions:learn-single', (action) => {
+		client.onPromise('action-definitions:learn-single', (action: ActionInstance) => {
 			if (action) {
 				const instance = this.instance.moduleHost.getChild(action.instance)
 				if (instance) {
@@ -137,7 +212,7 @@ class InstanceDefinitions extends CoreBase {
 				}
 			}
 		})
-		client.onPromise('feedback-definitions:learn-single', (feedback) => {
+		client.onPromise('feedback-definitions:learn-single', (feedback: FeedbackInstance) => {
 			if (feedback) {
 				const instance = this.instance.moduleHost.getChild(feedback.instance_id)
 				if (instance) {
@@ -184,12 +259,12 @@ class InstanceDefinitions extends CoreBase {
 	 * @param {boolean} booleanOnly - whether the feedback must be boolean
 	 * @access public
 	 */
-	createFeedbackItem(instanceId, feedbackId, booleanOnly) {
+	createFeedbackItem(instanceId: string, feedbackId: string, booleanOnly: boolean) {
 		const definition = this.getFeedbackDefinition(instanceId, feedbackId)
 		if (definition) {
 			if (booleanOnly && definition.type !== 'boolean') return null
 
-			const feedback = {
+			const feedback: FeedbackInstance = {
 				id: nanoid(),
 				type: feedbackId,
 				instance_id: instanceId,
@@ -214,10 +289,10 @@ class InstanceDefinitions extends CoreBase {
 		}
 	}
 
-	createEventItem(eventType) {
+	createEventItem(eventType: string) {
 		const definition = EventDefinitions[eventType]
 		if (definition) {
-			const event = {
+			const event: TriggerEventInstance = {
 				id: nanoid(),
 				type: eventType,
 				enabled: true,
@@ -225,7 +300,9 @@ class InstanceDefinitions extends CoreBase {
 			}
 
 			for (const opt of definition.options) {
-				event.options[opt.id] = cloneDeep(opt.default)
+				if ('default' in opt) {
+					event.options[opt.id] = cloneDeep(opt.default)
+				}
 			}
 
 			return event
@@ -236,18 +313,18 @@ class InstanceDefinitions extends CoreBase {
 
 	/**
 	 * Forget all the definitions for an instance
-	 * @param {string} instance_id
+	 * @param {string} instanceId
 	 * @access public
 	 */
-	forgetInstance(instance_id) {
-		delete this.#presetDefinitions[instance_id]
-		this.io.emitToRoom(PresetsRoom, 'presets:update', instance_id, undefined)
+	forgetInstance(instanceId: string) {
+		delete this.#presetDefinitions[instanceId]
+		this.io.emitToRoom(PresetsRoom, 'presets:update', instanceId, undefined)
 
-		delete this.#actionDefinitions[instance_id]
-		this.io.emitToRoom(ActionsRoom, 'action-definitions:update', instance_id, undefined)
+		delete this.#actionDefinitions[instanceId]
+		this.io.emitToRoom(ActionsRoom, 'action-definitions:update', instanceId, undefined)
 
-		delete this.#feedbackDefinitions[instance_id]
-		this.io.emitToRoom(FeedbacksRoom, 'feedback-definitions:update', instance_id, undefined)
+		delete this.#feedbackDefinitions[instanceId]
+		this.io.emitToRoom(FeedbacksRoom, 'feedback-definitions:update', instanceId, undefined)
 	}
 
 	/**
@@ -256,7 +333,7 @@ class InstanceDefinitions extends CoreBase {
 	 * @param {string} actionId
 	 * @access public
 	 */
-	getActionDefinition(instanceId, actionId) {
+	getActionDefinition(instanceId: string, actionId: string) {
 		if (this.#actionDefinitions[instanceId]) {
 			return this.#actionDefinitions[instanceId][actionId]
 		} else {
@@ -270,7 +347,7 @@ class InstanceDefinitions extends CoreBase {
 	 * @param {string} feedbackId
 	 * @access public
 	 */
-	getFeedbackDefinition(instanceId, feedbackId) {
+	getFeedbackDefinition(instanceId: string, feedbackId: string) {
 		if (this.#feedbackDefinitions[instanceId]) {
 			return this.#feedbackDefinitions[instanceId][feedbackId]
 		} else {
@@ -280,14 +357,14 @@ class InstanceDefinitions extends CoreBase {
 
 	/**
 	 * Import a preset onto a bank
-	 * @param {string} instance_id
+	 * @param {string} instanceId
 	 * @param {object} preset_id
 	 * @param {number} page
 	 * @param {number} bank
 	 * @access public
 	 */
-	importPresetToBank(instance_id, preset_id, page, bank) {
-		const definition = cloneDeep(this.#presetDefinitions[instance_id]?.[preset_id])
+	importPresetToBank(instanceId: string, preset_id: string, page: number, bank: number) {
+		const definition = cloneDeep(this.#presetDefinitions[instanceId]?.[preset_id])
 		if (definition) {
 			if (definition.steps) {
 				const newSteps = {}
@@ -297,7 +374,7 @@ class InstanceDefinitions extends CoreBase {
 						const actions_set = definition.steps[i][set]
 						for (const action of actions_set) {
 							action.id = nanoid()
-							action.instance = instance_id
+							action.instance = instanceId
 							action.delay = action.delay ?? 0
 						}
 					}
@@ -306,10 +383,16 @@ class InstanceDefinitions extends CoreBase {
 			}
 
 			if (definition.feedbacks) {
-				for (let i = 0; i < definition.feedbacks.length; ++i) {
-					definition.feedbacks[i].id = nanoid()
-					definition.feedbacks[i].instance_id = instance_id
-				}
+				definition.feedbacks = definition.feedbacks.map(
+					(fb) =>
+						({
+							id: nanoid(),
+							instance_id: instanceId,
+							type: fb.type,
+							options: fb.options,
+							style: fb.style,
+						} satisfies FeedbackInstance)
+				)
 			} else {
 				definition.feedbacks = []
 			}
@@ -329,7 +412,7 @@ class InstanceDefinitions extends CoreBase {
 	 * @param {object} actions
 	 * @access public
 	 */
-	setActionDefinitions(instanceId, actions) {
+	setActionDefinitions(instanceId: string, actions: Record<string, ActionDefinition>) {
 		this.#actionDefinitions[instanceId] = actions
 		this.io.emitToRoom(ActionsRoom, 'action-definitions:update', instanceId, actions)
 	}
@@ -340,7 +423,7 @@ class InstanceDefinitions extends CoreBase {
 	 * @param {object} feedbacks - the feedback definitions
 	 * @access public
 	 */
-	setFeedbackDefinitions(instanceId, feedbacks) {
+	setFeedbackDefinitions(instanceId: string, feedbacks: Record<string, FeedbackDefinition>) {
 		this.#feedbackDefinitions[instanceId] = feedbacks
 		this.io.emitToRoom(FeedbacksRoom, 'feedback-definitions:update', instanceId, feedbacks)
 	}
@@ -348,12 +431,12 @@ class InstanceDefinitions extends CoreBase {
 	/**
 	 * Set the preset definitions for an instance
 	 * @access public
-	 * @param {string} instance_id
+	 * @param {string} instanceId
 	 * @param {string} label
 	 * @param {object} rawPresets
 	 */
-	setPresetDefinitions(instance_id, label, rawPresets) {
-		const newPresets = {}
+	setPresetDefinitions(instanceId: string, label: string, rawPresets: Record<string, ModulePresetDefinition>) {
+		const newPresets: Record<string, ButtonPresetDefinition> = {}
 
 		for (const [id, rawPreset] of Object.entries(rawPresets)) {
 			try {
@@ -369,16 +452,19 @@ class InstanceDefinitions extends CoreBase {
 						options: fb.options,
 						style: fb.style,
 					})),
-					steps: rawPreset.steps.map((step) => {
-						const action_sets = {}
-						for (const [setId, set] of Object.entries(step)) {
-							action_sets[setId] = set.map((act) => ({
-								action: act.actionId,
-								options: act.options,
-							}))
-						}
-						return action_sets
-					}),
+					steps: rawPreset.steps.map(
+						(step) =>
+							({
+								down: convertPresetActions(step.down),
+								up: convertPresetActions(step.up),
+								rotate_left: rawPreset.options?.rotaryActions
+									? convertPresetActions(step.rotate_left || [])
+									: undefined,
+								rotate_right: rawPreset.options?.rotaryActions
+									? convertPresetActions(step.rotate_right || [])
+									: undefined,
+							} satisfies Complete<ButtonPresetStepActions>)
+					),
 				}
 
 				if (!newPresets[id].steps.length) {
@@ -389,7 +475,7 @@ class InstanceDefinitions extends CoreBase {
 			}
 		}
 
-		this.#updateVariablePrefixesAndStoreDefinitions(instance_id, label, newPresets)
+		this.#updateVariablePrefixesAndStoreDefinitions(instanceId, label, newPresets)
 	}
 
 	/**
@@ -397,8 +483,8 @@ class InstanceDefinitions extends CoreBase {
 	 * @param {object} presets
 	 * @access private
 	 */
-	#simplifyPresetsForUi(presets) {
-		const res = {}
+	#simplifyPresetsForUi(presets: Record<string, ButtonPresetDefinition>): Record<string, UIPreset> {
+		const res: Record<string, UIPreset> = {}
 
 		for (const [id, preset] of Object.entries(presets)) {
 			res[id] = {
@@ -413,25 +499,29 @@ class InstanceDefinitions extends CoreBase {
 
 	/**
 	 * Update all the variables in the presets to reference the supplied label
-	 * @param {string} instance_id
+	 * @param {string} instanceId
 	 * @param {string} labelTo
 	 */
-	updateVariablePrefixesForLabel(instance_id, labelTo) {
-		if (this.#presetDefinitions[instance_id] !== undefined) {
+	updateVariablePrefixesForLabel(instanceId: string, labelTo: string) {
+		if (this.#presetDefinitions[instanceId] !== undefined) {
 			this.logger.silly('Updating presets for instance ' + labelTo)
-			this.#updateVariablePrefixesAndStoreDefinitions(instance_id, labelTo, this.#presetDefinitions[instance_id])
+			this.#updateVariablePrefixesAndStoreDefinitions(instanceId, labelTo, this.#presetDefinitions[instanceId])
 		}
 	}
 
 	/**
 	 * Update all the variables in the presets to reference the supplied label, and store them
-	 * @param {string} instance_id
+	 * @param {string} instanceId
 	 * @param {string} label
 	 * @param {object} presets
 	 */
-	#updateVariablePrefixesAndStoreDefinitions(instance_id, label, presets) {
+	#updateVariablePrefixesAndStoreDefinitions(
+		instanceId: string,
+		label: string,
+		presets: Record<string, ButtonPresetDefinition>
+	) {
 		const variableRegex = /\$\(([^:)]+):([^)]+)\)/g
-		function replaceAllVariables(fixtext) {
+		function replaceAllVariables(fixtext: string) {
 			if (fixtext && fixtext.includes('$(')) {
 				let matches
 				while ((matches = variableRegex.exec(fixtext)) !== null) {
@@ -462,8 +552,8 @@ class InstanceDefinitions extends CoreBase {
 			}
 		}
 
-		this.#presetDefinitions[instance_id] = presets
-		this.io.emitToRoom(PresetsRoom, 'presets:update', instance_id, this.#simplifyPresetsForUi(presets))
+		this.#presetDefinitions[instanceId] = presets
+		this.io.emitToRoom(PresetsRoom, 'presets:update', instanceId, this.#simplifyPresetsForUi(presets))
 	}
 }
 

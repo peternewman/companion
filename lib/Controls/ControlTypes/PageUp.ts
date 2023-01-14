@@ -1,8 +1,12 @@
+import { ActionInstance, Registry, SomeDrawStyle } from '../../tmp.js'
 import ControlBase from '../ControlBase.js'
-import Registry from '../../Registry.js'
+
+interface PageUpConfig {
+	type: 'pageup'
+}
 
 /**
- * Class for a pagenum button control.
+ * Class for a pageup button control.
  *
  * @extends ControlBase
  * @author Håkon Nessjøen <haakon@bitfocus.io>
@@ -22,8 +26,8 @@ import Registry from '../../Registry.js'
  * develop commercial activities involving the Companion software without
  * disclosing the source code of your own applications.
  */
-export default class ControlButtonPageNumber extends ControlBase {
-	type = 'pagenum'
+export default class ControlButtonPageUp extends ControlBase<PageUpConfig> {
+	readonly type = 'pageup'
 
 	/**
 	 * @param {Registry} registry - the application core
@@ -31,8 +35,8 @@ export default class ControlButtonPageNumber extends ControlBase {
 	 * @param {object} storage - persisted storage object
 	 * @param {boolean} isImport - if this is importing a button, not creating at startup
 	 */
-	constructor(registry, controlId, storage, isImport) {
-		super(registry, controlId, 'page-button', 'Controls/Button/PageNumber')
+	constructor(registry: Registry, controlId: string, storage: PageUpConfig, isImport: boolean) {
+		super(registry, controlId, 'page-button', 'Controls/Button/PageUp')
 
 		if (!storage) {
 			// New control
@@ -42,8 +46,7 @@ export default class ControlButtonPageNumber extends ControlBase {
 
 			// Notify interested
 		} else {
-			if (storage.type !== 'pagenum')
-				throw new Error(`Invalid type given to ControlButtonPageNumber: "${storage.type}"`)
+			if (storage.type !== 'pageup') throw new Error(`Invalid type given to ControlButtonPageUp: "${storage.type}"`)
 
 			if (isImport) this.commitChange()
 		}
@@ -52,7 +55,7 @@ export default class ControlButtonPageNumber extends ControlBase {
 	/**
 	 * Get all the actions on this control
 	 */
-	getAllActions() {
+	getAllActions(): ActionInstance[] {
 		return []
 	}
 
@@ -61,9 +64,9 @@ export default class ControlButtonPageNumber extends ControlBase {
 	 * @returns the processed style of the button
 	 * @access public
 	 */
-	getDrawStyle() {
+	getDrawStyle(): SomeDrawStyle {
 		return {
-			style: 'pagenum',
+			style: 'pageup',
 		}
 	}
 
@@ -73,9 +76,9 @@ export default class ControlButtonPageNumber extends ControlBase {
 	 * @param {string | undefined} deviceId The surface that intiated this press
 	 * @access public
 	 */
-	pressControl(pressed, deviceId) {
+	pressControl(pressed: boolean, deviceId: string | undefined): void {
 		if (pressed) {
-			this.surfaces.devicePageSet(deviceId, 1)
+			this.surfaces.devicePageUp(deviceId)
 		}
 	}
 
@@ -85,7 +88,7 @@ export default class ControlButtonPageNumber extends ControlBase {
 	 * @param {boolean} clone - Whether to return a cloned object
 	 * @access public
 	 */
-	toJSON(clone = true) {
+	toJSON(clone = true): PageUpConfig {
 		return {
 			type: this.type,
 		}

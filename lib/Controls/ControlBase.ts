@@ -1,10 +1,10 @@
 import { cloneDeep } from 'lodash-es'
 import CoreBase from '../Core/Base.js'
-import Registry from '../Registry.js'
 import jsonPatch from 'fast-json-patch'
 import debounceFn from 'debounce-fn'
+import { Registry } from '../tmp.js'
 
-export function ControlConfigRoom(controlId) {
+export function ControlConfigRoom(controlId: string): string {
 	return `controls:${controlId}`
 }
 
@@ -30,17 +30,21 @@ export function ControlConfigRoom(controlId) {
  * develop commercial activities involving the Companion software without
  * disclosing the source code of your own applications.
  */
-export default class ControlBase extends CoreBase {
+export default abstract class ControlBase<TConfigJson, TRuntimeJson = Record<string, never>> extends CoreBase {
+	public readonly controlId: string
+
+	public abstract type: string
+
 	/**
 	 * The last sent config json object
 	 * @access private
 	 */
-	#lastSentConfigJson = null
+	#lastSentConfigJson: TConfigJson | null = null
 	/**
 	 * The last sent runtime json object
 	 * @access private
 	 */
-	#lastSentRuntimeJson = null
+	#lastSentRuntimeJson: TRuntimeJson | null = null
 
 	/**
 	 * @param {Registry} registry - the application core
@@ -48,7 +52,7 @@ export default class ControlBase extends CoreBase {
 	 * @param {string} logSource
 	 * @param {string} debugNamespace
 	 */
-	constructor(registry, controlId, logSource, debugNamespace) {
+	constructor(registry: Registry, controlId: string, logSource: string, debugNamespace: string) {
 		super(registry, logSource, debugNamespace)
 
 		this.controlId = controlId
@@ -60,7 +64,7 @@ export default class ControlBase extends CoreBase {
 	 * @param {boolean} redraw - whether to redraw the control
 	 * @access protected
 	 */
-	commitChange(redraw = true) {
+	commitChange(redraw = true): void {
 		// Trigger redraw
 		if (redraw) this.triggerRedraw()
 
@@ -139,7 +143,7 @@ export default class ControlBase extends CoreBase {
 	 * @access public
 	 * @abstract
 	 */
-	toJSON(clone = true) {
+	toJSON(clone = true): TConfigJson {
 		throw new Error('must be implemented by subclass!')
 	}
 
@@ -148,8 +152,8 @@ export default class ControlBase extends CoreBase {
 	 * Not all controls have additional data
 	 * @access public
 	 */
-	toRuntimeJSON() {
-		return {}
+	toRuntimeJSON(): TRuntimeJson {
+		return {} as TRuntimeJson
 	}
 
 	/**

@@ -15,8 +15,9 @@
  *
  */
 
-import Image from './Image.js'
+import Image, { HAlignment, VAlignment } from './Image.js'
 import { rgb } from '../Resources/Util.js'
+import type { ButtonDrawStyle, SomeDrawStyle } from '../tmp.js'
 
 const colorButtonYellow = rgb(255, 198, 0)
 const colorWhite = rgb(255, 255, 255)
@@ -56,8 +57,8 @@ export default class GraphicsRenderer {
 		const img = new Image(72, 72)
 
 		if (!options.remove_topbar) {
-			img.drawTextLine(2, 3, `${page}.${bank}`, img.rgb(50, 50, 50), 0)
-			img.horizontalLine(13, img.rgb(30, 30, 30))
+			img.drawTextLine(2, 3, `${page}.${bank}`, rgb(50, 50, 50), 0)
+			img.horizontalLine(13, rgb(30, 30, 30))
 		}
 
 		return img.bufferAndTime()
@@ -75,7 +76,7 @@ export default class GraphicsRenderer {
 	 */
 	static drawBankImage(
 		options: GraphicsDrawOptions,
-		bankStyle,
+		bankStyle: SomeDrawStyle,
 		page: number | undefined,
 		bank: number | undefined,
 		pagename: string
@@ -87,10 +88,10 @@ export default class GraphicsRenderer {
 		if (bankStyle.style == 'pageup') {
 			draw_style = 'pageup'
 
-			img.fillColor(img.rgb(15, 15, 15))
+			img.fillColor(rgb(15, 15, 15))
 
 			if (options.page_plusminus) {
-				img.drawChar(30, 20, options.page_direction_flipped ? charCodeMinus : charCodePlus, colorWhite, 0, 1)
+				img.drawChar(30, 20, options.page_direction_flipped ? charCodeMinus : charCodePlus, colorWhite, 0, true)
 			} else {
 				img.drawIcon(26, 20, 'arrow_up', colorWhite)
 			}
@@ -99,10 +100,10 @@ export default class GraphicsRenderer {
 		} else if (bankStyle.style == 'pagedown') {
 			draw_style = 'pagedown'
 
-			img.fillColor(img.rgb(15, 15, 15))
+			img.fillColor(rgb(15, 15, 15))
 
 			if (options.page_plusminus) {
-				img.drawChar(30, 40, options.page_direction_flipped ? charCodePlus : charCodeMinus, colorWhite, 0, 1)
+				img.drawChar(30, 40, options.page_direction_flipped ? charCodePlus : charCodeMinus, colorWhite, 0, true)
 			} else {
 				img.drawIcon(26, 40, 'arrow_down', colorWhite)
 			}
@@ -111,7 +112,7 @@ export default class GraphicsRenderer {
 		} else if (bankStyle.style == 'pagenum') {
 			draw_style = 'pagenum'
 
-			img.fillColor(img.rgb(15, 15, 15))
+			img.fillColor(rgb(15, 15, 15))
 
 			if (page === undefined) {
 				// Preview (no page/bank)
@@ -121,14 +122,16 @@ export default class GraphicsRenderer {
 				img.drawAlignedText(0, 0, 72, 30, 'PAGE', colorButtonYellow, 0, undefined, 1, 'center', 'bottom')
 				img.drawAlignedText(0, 32, 72, 30, '' + page, colorWhite, 18, undefined, 1, 'center', 'top')
 			} else {
-				img.drawAlignedText(0, 0, 72, 72, pagename, colorWhite, '18', 2, 0, 'center', 'center')
+				img.drawAlignedText(0, 0, 72, 72, pagename, colorWhite, 18, 2, 0, 'center', 'center')
 			}
-		} else if (bankStyle.style) {
+		} else if (bankStyle.style == 'button') {
 			draw_style = bankStyle
 
-			let show_topbar = bankStyle.show_topbar
+			let show_topbar: boolean
 			if (bankStyle.show_topbar === 'default' || bankStyle.show_topbar === undefined) {
 				show_topbar = !options.remove_topbar
+			} else {
+				show_topbar = bankStyle.show_topbar
 			}
 
 			// handle upgrade from pre alignment-support configuration
@@ -145,8 +148,8 @@ export default class GraphicsRenderer {
 			if (bankStyle.png64 !== undefined && bankStyle.png64 !== null) {
 				try {
 					let data = Buffer.from(bankStyle.png64, 'base64')
-					let halign = bankStyle.pngalignment.split(':', 2)[0]
-					let valign = bankStyle.pngalignment.split(':', 2)[1]
+					let halign = bankStyle.pngalignment.split(':', 2)[0] as HAlignment
+					let valign = bankStyle.pngalignment.split(':', 2)[1] as VAlignment
 
 					!show_topbar
 						? img.drawFromPNGdata(data, 0, 0, 72, 72, halign, valign)
@@ -154,8 +157,8 @@ export default class GraphicsRenderer {
 				} catch (e) {
 					img.boxFilled(0, 14, 71, 57, 0)
 					!show_topbar
-						? img.drawAlignedText(2, 2, 68, 68, 'PNG ERROR', img.rgb(255, 0, 0), 0, 2, 1, 'center', 'center')
-						: img.drawAlignedText(2, 18, 68, 52, 'PNG ERROR', img.rgb(255, 0, 0), 0, 2, 1, 'center', 'center')
+						? img.drawAlignedText(2, 2, 68, 68, 'PNG ERROR', rgb(255, 0, 0), 0, 2, 1, 'center', 'center')
+						: img.drawAlignedText(2, 18, 68, 52, 'PNG ERROR', rgb(255, 0, 0), 0, 2, 1, 'center', 'center')
 
 					GraphicsRenderer.#drawTopbar(img, show_topbar, bankStyle, page, bank)
 					return {
@@ -175,7 +178,7 @@ export default class GraphicsRenderer {
 						const x = image.x ?? 0
 						const y = yOffset + (image.y ?? 0)
 						const width = image.width || 72
-						const height = image.width || 72 - yOffset
+						const height = image.height || 72 - yOffset
 
 						img.drawPixelBuffer(x, y, width, height, image.buffer)
 					}
@@ -183,8 +186,8 @@ export default class GraphicsRenderer {
 			} catch (e) {
 				img.fillColor(0)
 				!show_topbar
-					? img.drawAlignedText(2, 2, 68, 68, 'IMAGE\\nDRAW\\nERROR', img.rgb(255, 0, 0), 0, 2, 1, 'center', 'center')
-					: img.drawAlignedText(2, 18, 68, 52, 'IMAGE\\nDRAW\\nERROR', img.rgb(255, 0, 0), 0, 2, 1, 'center', 'center')
+					? img.drawAlignedText(2, 2, 68, 68, 'IMAGE\\nDRAW\\nERROR', rgb(255, 0, 0), 0, 2, 1, 'center', 'center')
+					: img.drawAlignedText(2, 18, 68, 52, 'IMAGE\\nDRAW\\nERROR', rgb(255, 0, 0), 0, 2, 1, 'center', 'center')
 
 				GraphicsRenderer.#drawTopbar(img, show_topbar, bankStyle, page, bank)
 				return {
@@ -226,7 +229,13 @@ export default class GraphicsRenderer {
 	 * @access private
 	 * @returns Image
 	 */
-	static #drawTopbar(img: Image, show_topbar: boolean, bankStyle, page: number | undefined, bank: number | undefined) {
+	static #drawTopbar(
+		img: Image,
+		show_topbar: boolean,
+		bankStyle: ButtonDrawStyle,
+		page: number | undefined,
+		bank: number | undefined
+	) {
 		if (!show_topbar) {
 			if (bankStyle.pushed) {
 				img.drawBorder(3, colorButtonYellow)
@@ -254,10 +263,10 @@ export default class GraphicsRenderer {
 			let statusColour: number | false | null = null
 			switch (bankStyle.bank_status) {
 				case 'error':
-					statusColour = img.rgb(255, 0, 0)
+					statusColour = rgb(255, 0, 0)
 					break
 				case 'warning':
-					statusColour = img.rgb(255, 127, 0)
+					statusColour = rgb(255, 127, 0)
 					break
 			}
 
@@ -266,7 +275,7 @@ export default class GraphicsRenderer {
 			}
 
 			if (bankStyle.action_running) {
-				img.drawChar(55, 3, 'play', img.rgb(0, 255, 0), 'icon')
+				img.drawIcon(55, 3, 'play', rgb(0, 255, 0))
 			}
 		}
 
@@ -284,14 +293,14 @@ export default class GraphicsRenderer {
 	 */
 	static drawPincodeNumber(num: number) {
 		const img = new Image(72, 72)
-		img.fillColor(img.rgb(15, 15, 15))
+		img.fillColor(rgb(15, 15, 15))
 		img.drawAlignedText(0, 0, 72, 72, `${num}`, colorWhite, 44, undefined, 44, 'center', 'center')
 		return img.bufferAndTime()
 	}
 
 	static drawPincodeEntry(code: string) {
 		const img = new Image(72, 72)
-		img.fillColor(img.rgb(15, 15, 15))
+		img.fillColor(rgb(15, 15, 15))
 		img.drawAlignedText(0, -10, 72, 72, 'Lockout', colorButtonYellow, 14, undefined, 44, 'center', 'center')
 		if (code !== undefined) {
 			img.drawAlignedText(
@@ -301,7 +310,7 @@ export default class GraphicsRenderer {
 				72,
 				code.replace(/[a-z0-9]/gi, '*'),
 				colorWhite,
-				'18',
+				18,
 				undefined,
 				44,
 				'center',

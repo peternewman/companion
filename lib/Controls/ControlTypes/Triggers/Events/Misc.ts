@@ -1,5 +1,19 @@
+import type { ChildLogger } from '../../../../Log/Controller.js'
 import { ParseControlId } from '../../../../Shared/ControlId.js'
+import type { Registry } from '../../../../tmp.js'
 
+interface StartupEvent {
+	id: string
+	delay: number
+}
+interface ClientConnectEvent {
+	id: string
+	delay: number
+}
+interface ControlPressEvent {
+	id: string
+	pressed: boolean
+}
 /**
  * This is a special event runner, it handles miscellaneous simple events *
  *
@@ -26,21 +40,21 @@ export default class TriggersEventMisc {
 	 * @type {Array}
 	 * @access private
 	 */
-	#clientConnectEvents = []
+	#clientConnectEvents: ClientConnectEvent[] = []
 
 	/**
 	 * Enabled events listening for button presses
 	 * @type {Array}
 	 * @access private
 	 */
-	#controlPressEvents = []
+	#controlPressEvents: ControlPressEvent[] = []
 
 	/**
 	 * Whether the trigger is currently enabled
 	 * @type {boolean}
 	 * @access private
 	 */
-	#enabled = false
+	#enabled: boolean = false
 
 	/**
 	 * Shared event bus, across all triggers
@@ -54,23 +68,23 @@ export default class TriggersEventMisc {
 	 * @type {Function}
 	 * @access private
 	 */
-	#executeActions
+	#executeActions: (nowTime: number) => void
 
 	/**
 	 * The logger for this class
 	 * @type {winston.Logger}
 	 * @access protected
 	 */
-	logger
+	logger: ChildLogger
 
 	/**
 	 * Enabled events listening for startup
 	 * @type {Array}
 	 * @access private
 	 */
-	#startupEvents = []
+	#startupEvents: StartupEvent[] = []
 
-	constructor(registry, eventBus, controlId, executeActions) {
+	constructor(registry: Registry, eventBus, controlId: string, executeActions: (nowTime: number) => void) {
 		this.logger = registry.log.createLogger(`Controls/Triggers/Events/Misc/${controlId}`)
 
 		this.#eventBus = eventBus
@@ -99,7 +113,7 @@ export default class TriggersEventMisc {
 	 * @param {string | undefined} deviceId Source of the event
 	 * @access private
 	 */
-	#onControlPress = (controlId, pressed, deviceId) => {
+	#onControlPress = (controlId: string, pressed: boolean, deviceId: string | undefined) => {
 		if (this.#enabled) {
 			// If the press originated from a trigger, then ignore it
 			const parsedDeviceId = ParseControlId(deviceId)
@@ -121,7 +135,7 @@ export default class TriggersEventMisc {
 				setImmediate(() => {
 					try {
 						this.#executeActions(nowTime)
-					} catch (e) {
+					} catch (e: any) {
 						this.logger.warn(`Execute actions failed: ${e?.toString?.() ?? e?.message ?? e}`)
 					}
 				})
@@ -145,7 +159,7 @@ export default class TriggersEventMisc {
 	 * @param {Array} array of events
 	 * @access private
 	 */
-	#runEvents(events) {
+	#runEvents(events: ClientConnectEvent[] | ControlPressEvent[] | StartupEvent[]) {
 		if (this.#enabled) {
 			const nowTime = Date.now()
 
@@ -153,10 +167,10 @@ export default class TriggersEventMisc {
 				setTimeout(() => {
 					try {
 						this.#executeActions(nowTime)
-					} catch (e) {
+					} catch (e: any) {
 						this.logger.warn(`Execute actions failed: ${e?.toString?.() ?? e?.message ?? e}`)
 					}
-				}, event.delay || 0)
+				}, ('delay' in event ? event.delay : 0) || 0)
 			}
 		}
 	}
@@ -165,7 +179,7 @@ export default class TriggersEventMisc {
 	 * Set whether the events are enabled
 	 * @param {boolean} enabled
 	 */
-	setEnabled(enabled) {
+	setEnabled(enabled: boolean) {
 		this.#enabled = enabled
 	}
 
@@ -174,7 +188,7 @@ export default class TriggersEventMisc {
 	 * @param {string} id Id of the event
 	 * @param {number} delay Execution delay (ms) after the event fires
 	 */
-	setStartup(id, delay) {
+	setStartup(id: string, delay: number) {
 		this.clearStartup(id)
 
 		this.#startupEvents.push({
@@ -187,7 +201,7 @@ export default class TriggersEventMisc {
 	 * Remove a startup event listener
 	 * @param {string} id Id of the event
 	 */
-	clearStartup(id) {
+	clearStartup(id: string) {
 		this.#startupEvents = this.#startupEvents.filter((int) => int.id !== id)
 	}
 
@@ -196,7 +210,7 @@ export default class TriggersEventMisc {
 	 * @param {string} id Id of the event
 	 * @param {number} delay Execution delay (ms) after the event fires
 	 */
-	setClientConnect(id, delay) {
+	setClientConnect(id: string, delay: number) {
 		this.clearClientConnect(id)
 
 		this.#clientConnectEvents.push({
@@ -209,7 +223,7 @@ export default class TriggersEventMisc {
 	 * Remove a client_connect event listener
 	 * @param {string} id Id of the event
 	 */
-	clearClientConnect(id) {
+	clearClientConnect(id: string) {
 		this.#clientConnectEvents = this.#clientConnectEvents.filter((int) => int.id !== id)
 	}
 
@@ -218,7 +232,7 @@ export default class TriggersEventMisc {
 	 * @param {string} id Id of the event
 	 * @param {boolean} pressed Listen for pressed or depressed events
 	 */
-	setControlPress(id, pressed) {
+	setControlPress(id: string, pressed: boolean) {
 		this.clearControlPress(id)
 
 		this.#controlPressEvents.push({
@@ -231,7 +245,7 @@ export default class TriggersEventMisc {
 	 * Remove a control_press event listener
 	 * @param {string} id Id of the event
 	 */
-	clearControlPress(id) {
+	clearControlPress(id: string) {
 		this.#controlPressEvents = this.#controlPressEvents.filter((int) => int.id !== id)
 	}
 }

@@ -1,5 +1,9 @@
-import CoreBase from '../Core/Base.js'
 import { performance } from 'perf_hooks'
+import { EventEmitter } from 'eventemitter3'
+
+type TriggerEventsEvents = {
+	tick: [nowSeconds: number, unixTime: number]
+}
 
 /**
  * Main bus for trigger events
@@ -23,21 +27,18 @@ import { performance } from 'perf_hooks'
  * develop commercial activities involving the Companion software without
  * disclosing the source code of your own applications.
  */
-export default class TriggerEvents extends CoreBase {
+export default class TriggerEvents extends EventEmitter<TriggerEventsEvents> {
 	/**
 	 * The last tick time emitted
 	 * @type {number}
 	 * @access private
 	 */
-	#lastTick = Math.round(performance.now() / 1000)
+	#lastTick: number = Math.round(performance.now() / 1000)
 
-	/**
-	 * @param {Registry} registry - the application core
-	 */
-	constructor(registry) {
-		super(registry, 'trigger-events', 'Controls/TriggerEvents')
+	constructor() {
+		super()
 
-		this.interval = setInterval(() => {
+		/* this.interval = */ setInterval(() => {
 			// Future: Would this benefit from ticking more than once a second?
 			const nowSeconds = Math.round(performance.now() / 1000)
 			this.#lastTick = nowSeconds

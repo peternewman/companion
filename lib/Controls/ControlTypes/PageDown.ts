@@ -1,5 +1,9 @@
+import { ActionInstance, Registry, SomeDrawStyle } from '../../tmp.js'
 import ControlBase from '../ControlBase.js'
-import Registry from '../../Registry.js'
+
+interface PageDownConfig {
+	type: 'pagedown'
+}
 
 /**
  * Class for a pagedown button control.
@@ -22,8 +26,8 @@ import Registry from '../../Registry.js'
  * develop commercial activities involving the Companion software without
  * disclosing the source code of your own applications.
  */
-export default class ControlButtonPageDown extends ControlBase {
-	type = 'pagedown'
+export default class ControlButtonPageDown extends ControlBase<PageDownConfig> {
+	readonly type = 'pagedown'
 
 	/**
 	 * @param {Registry} registry - the application core
@@ -31,7 +35,7 @@ export default class ControlButtonPageDown extends ControlBase {
 	 * @param {object} storage - persisted storage object
 	 * @param {boolean} isImport - if this is importing a button, not creating at startup
 	 */
-	constructor(registry, controlId, storage, isImport) {
+	constructor(registry: Registry, controlId: string, storage: PageDownConfig, isImport: boolean) {
 		super(registry, controlId, 'page-button', 'Controls/Button/Pagedown')
 
 		if (!storage) {
@@ -51,7 +55,7 @@ export default class ControlButtonPageDown extends ControlBase {
 	/**
 	 * Get all the actions on this control
 	 */
-	getAllActions() {
+	getAllActions(): ActionInstance[] {
 		return []
 	}
 
@@ -60,7 +64,7 @@ export default class ControlButtonPageDown extends ControlBase {
 	 * @returns the processed style of the button
 	 * @access public
 	 */
-	getDrawStyle() {
+	getDrawStyle(): SomeDrawStyle {
 		return {
 			style: 'pagedown',
 		}
@@ -72,7 +76,7 @@ export default class ControlButtonPageDown extends ControlBase {
 	 * @param {string | undefined} deviceId The surface that intiated this press
 	 * @access public
 	 */
-	pressControl(pressed, deviceId) {
+	pressControl(pressed: boolean, deviceId: string | undefined): void {
 		if (pressed) {
 			this.surfaces.devicePageDown(deviceId)
 		}
@@ -84,7 +88,7 @@ export default class ControlButtonPageDown extends ControlBase {
 	 * @param {boolean} clone - Whether to return a cloned object
 	 * @access public
 	 */
-	toJSON(clone = true) {
+	toJSON(clone = true): PageDownConfig {
 		return {
 			type: this.type,
 		}

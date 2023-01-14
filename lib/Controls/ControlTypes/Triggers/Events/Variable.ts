@@ -1,4 +1,10 @@
-import moment from 'moment'
+import type { ChildLogger } from '../../../../Log/Controller.js'
+import type { Registry, TriggerEventInstance } from '../../../../tmp.js'
+
+interface VariableChangeEvent {
+	id: string
+	variableId: string
+}
 
 /**
  * This is the runner for variables based trigger events
@@ -40,23 +46,23 @@ export default class TriggersEventVariables {
 	 * @type {Function}
 	 * @access private
 	 */
-	#executeActions
+	#executeActions: (nowTime: number) => void
 
 	/**
 	 * The logger for this class
 	 * @type {winston.Logger}
 	 * @access protected
 	 */
-	logger
+	logger: ChildLogger
 
 	/**
 	 * Enabled time of day events
 	 * @type {Array}
 	 * @access private
 	 */
-	#variableChangeEvents = []
+	#variableChangeEvents: VariableChangeEvent[] = []
 
-	constructor(registry, eventBus, controlId, executeActions) {
+	constructor(registry: Registry, eventBus, controlId: string, executeActions: (nowTime: number) => void) {
 		this.logger = registry.log.createLogger(`Controls/Triggers/Events/Timer/${controlId}`)
 
 		this.#eventBus = eventBus
@@ -78,7 +84,7 @@ export default class TriggersEventVariables {
 	 * @param {Object} event Event to describe
 	 * @returns
 	 */
-	getVariablesChangedDescription(event) {
+	getVariablesChangedDescription(event: TriggerEventInstance) {
 		return `When <strong>$(${event.options.variableId})</strong> changes`
 	}
 
@@ -87,7 +93,7 @@ export default class TriggersEventVariables {
 	 * @param {Set<string>} allChangedVariables Set of all the variables that have changed
 	 * @access private
 	 */
-	#onVariablesChanged = (allChangedVariables) => {
+	#onVariablesChanged = (allChangedVariables: Set<string>) => {
 		if (this.#enabled) {
 			let execute = false
 
@@ -103,7 +109,7 @@ export default class TriggersEventVariables {
 				setImmediate(() => {
 					try {
 						this.#executeActions(nowTime)
-					} catch (e) {
+					} catch (e: any) {
 						this.logger.warn(`Execute actions failed: ${e?.toString?.() ?? e?.message ?? e}`)
 					}
 				})
@@ -115,7 +121,7 @@ export default class TriggersEventVariables {
 	 * Set whether the events are enabled
 	 * @param {boolean} enabled
 	 */
-	setEnabled(enabled) {
+	setEnabled(enabled: boolean) {
 		this.#enabled = enabled
 	}
 
@@ -124,7 +130,7 @@ export default class TriggersEventVariables {
 	 * @param {string} id Id of the event
 	 * @param {string} variableId Id of the variable to watch
 	 */
-	setVariableChanged(id, variableId) {
+	setVariableChanged(id: string, variableId: string) {
 		this.clearVariableChanged(id)
 
 		this.#variableChangeEvents.push({
@@ -137,7 +143,7 @@ export default class TriggersEventVariables {
 	 * Remove a variable_changed event listener
 	 * @param {string} id Id of the event
 	 */
-	clearVariableChanged(id) {
+	clearVariableChanged(id: string) {
 		this.#variableChangeEvents = this.#variableChangeEvents.filter((int) => int.id !== id)
 	}
 }
