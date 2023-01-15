@@ -1,4 +1,4 @@
-import { CompanionAlignment } from '@companion-module/base'
+import { CompanionAlignment, CompanionFeedbackButtonStyleResult } from '@companion-module/base'
 import { Server, Socket } from 'socket.io'
 import { EventsMap, ReservedOrUserEventNames, ReservedOrUserListener } from 'socket.io/dist/typed-events'
 import type LogController from './Log/Controller'
@@ -48,21 +48,15 @@ export interface SocketServerExt extends Server {
 	emitToRoom(room: string, ...args: any[]): void
 }
 
-export interface ButtonStyle {
-	show_topbar: boolean | 'default' | undefined
-}
+export type ButtonStyle = ButtonDrawStyleBase
+
 export type SomeDrawStyle = PageButtonDrawStyle | ButtonDrawStyle
 export interface PageButtonDrawStyle {
 	style: 'pageup' | 'pagedown' | 'pagenum'
 }
-export interface ButtonDrawStyle {
-	style: 'pageup' | 'pagedown' | 'pagenum' | 'button'
+
+export interface ButtonDrawStyleBase {
 	show_topbar: boolean | 'default' | undefined
-	pushed: boolean
-	step_cycle: number | undefined
-	bank_status: 'error' | 'warning' | 'ok' | undefined
-	action_running: boolean
-	cloud: boolean
 
 	alignment: CompanionAlignment
 	pngalignment: CompanionAlignment
@@ -70,12 +64,24 @@ export interface ButtonDrawStyle {
 	bgcolor: number
 	color: number
 
-	png64: string
+	png64: string | null
 
 	imageBuffers: ButtonDrawImageBuffer[]
 
-	size: number | 'small' | 'large'
+	size: number | 'small' | 'large' | 'auto'
 	text: string
+	textExpression: boolean
+}
+
+export type BankStatus = 'error' | 'warning' | 'good'
+
+export interface ButtonDrawStyle extends ButtonDrawStyleBase {
+	style: 'button'
+	pushed: boolean
+	step_cycle: number | undefined
+	bank_status: BankStatus | undefined
+	action_running: boolean
+	cloud: boolean
 }
 
 export interface ButtonDrawImageBuffer {
@@ -98,6 +104,8 @@ export interface ActionInstance {
 	instance: string
 	options: Record<string, any>
 	delay: number
+
+	disabled?: boolean
 }
 
 export interface FeedbackInstance {
@@ -106,7 +114,7 @@ export interface FeedbackInstance {
 	instance_id: string
 	options: Record<string, any>
 
-	style?: unknown
+	style?: Partial<CompanionFeedbackButtonStyleResult>
 
 	disabled?: boolean
 }

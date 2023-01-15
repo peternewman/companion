@@ -1,7 +1,7 @@
 import CoreBase from '../../Core/Base.js'
-import { clamp } from '../../Resources/Util.js'
 import { cloneDeep } from 'lodash-es'
 import { nanoid } from 'nanoid'
+import type { ActionInstance, Registry } from '../../tmp.js'
 
 /**
  * Helper for ControlTypes with actions
@@ -25,12 +25,19 @@ import { nanoid } from 'nanoid'
  * develop commercial activities involving the Companion software without
  * disclosing the source code of your own applications.
  */
-export default class FragmentActions extends CoreBase {
+export default class FragmentActions<TOptions = Record<string, never>> extends CoreBase {
+	public readonly controlId: string
+
 	/**
 	 * The action-sets on this button
 	 * @access public
 	 */
-	action_sets = {}
+	action_sets: Record<string, ActionInstance[]> = {}
+
+	options: TOptions = {} as any // TODO HACK
+
+	private readonly commitChange: (redraw?: boolean) => void
+	private readonly checkButtonStatus: () => void
 
 	/**
 	 * @param {Registry} registry - the application core
@@ -38,7 +45,12 @@ export default class FragmentActions extends CoreBase {
 	 * @param {string} logSource
 	 * @param {string} debugNamespace
 	 */
-	constructor(registry, controlId, commitChange, checkButtonStatus) {
+	constructor(
+		registry: Registry,
+		controlId: string,
+		commitChange: (redraw?: boolean) => void,
+		checkButtonStatus: () => void
+	) {
 		super(registry, 'fragment-actions', 'Controls/Fragments/Actions')
 
 		this.controlId = controlId
@@ -53,7 +65,7 @@ export default class FragmentActions extends CoreBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionAdd(setId, actionItem) {
+	actionAdd(setId: string, actionItem: ActionInstance) {
 		if (this.action_sets[setId] === undefined) {
 			// cant implicitly create a set
 			this.logger.silly(`Missing set ${this.controlId}:${setId}`)
@@ -75,7 +87,7 @@ export default class FragmentActions extends CoreBase {
 	 * @param {Array} newActions actions to append
 	 * @access public
 	 */
-	actionAppend(setId, newActions) {
+	actionAppend(setId: string, newActions: ActionInstance[]) {
 		const action_set = this.action_sets[setId]
 		if (action_set) {
 			// Add new actions
@@ -99,7 +111,7 @@ export default class FragmentActions extends CoreBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionClearSet(setId, skipCommit = false) {
+	actionClearSet(setId: string, skipCommit = false) {
 		const action_set = this.action_sets[setId]
 		if (action_set) {
 			for (const action of action_set) {
@@ -123,7 +135,7 @@ export default class FragmentActions extends CoreBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionDuplicate(setId, id) {
+	actionDuplicate(setId: string, id: string) {
 		const action_set = this.action_sets[setId]
 		if (action_set) {
 			const index = action_set.findIndex((act) => act.id === id)
@@ -153,7 +165,7 @@ export default class FragmentActions extends CoreBase {
 	 * @param {boolean} enabled
 	 * @access public
 	 */
-	actionEnabled(setId, id, enabled) {
+	actionEnabled(setId: string, id: string, enabled: boolean) {
 		const action_set = this.action_sets[setId]
 		if (action_set) {
 			for (const action of action_set) {
@@ -184,7 +196,7 @@ export default class FragmentActions extends CoreBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	async actionLearn(setId, id) {
+	async actionLearn(setId: string, id: string) {
 		const action_set = this.action_sets[setId]
 		if (action_set) {
 			const action = action_set.find((act) => act.id === id)
@@ -215,7 +227,7 @@ export default class FragmentActions extends CoreBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionRemove(setId, id) {
+	actionRemove(setId: string, id: string) {
 		const action_set = this.action_sets[setId]
 		if (action_set) {
 			const index = action_set.findIndex((act) => act.id === id)
@@ -270,7 +282,7 @@ export default class FragmentActions extends CoreBase {
 	 * @param {Array} newActions actions to populate
 	 * @access public
 	 */
-	actionReplaceAll(setId, newActions) {
+	actionReplaceAll(setId: string, newActions: ActionInstance[]) {
 		const action_set = this.action_sets[setId]
 		if (action_set) {
 			// Remove the old actions
@@ -302,7 +314,7 @@ export default class FragmentActions extends CoreBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionSetDelay(setId, id, delay) {
+	actionSetDelay(setId: string, id: string, delay: number) {
 		const action_set = this.action_sets[setId]
 		if (action_set) {
 			for (const action of action_set) {
@@ -331,7 +343,7 @@ export default class FragmentActions extends CoreBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionSetOption(setId, id, key, value) {
+	actionSetOption(setId: string, id: string, key: string, value: any) {
 		const action_set = this.action_sets[setId]
 		if (action_set) {
 			for (const action of action_set) {
@@ -358,11 +370,11 @@ export default class FragmentActions extends CoreBase {
 	 * @param {object} action the action which changed
 	 * @access private
 	 */
-	#actionSubscribe(action) {
+	#actionSubscribe(action: ActionInstance) {
 		if (!action.disabled) {
 			const instance = this.instance.moduleHost.getChild(action.instance, true)
 			if (instance) {
-				instance.actionUpdate(action, this.controlId).catch((e) => {
+				instance.actionUpdate(action, this.controlId).catch((e: any) => {
 					this.logger.silly(`action_update to connection failed: ${e.message}`)
 				})
 			}
@@ -374,11 +386,11 @@ export default class FragmentActions extends CoreBase {
 	 * @param {object} action the action being removed
 	 * @access protected
 	 */
-	cleanupAction(action) {
+	cleanupAction(action: ActionInstance) {
 		// Inform relevant module
 		const instance = this.instance.moduleHost.getChild(action.instance, true)
 		if (instance) {
-			instance.actionDelete(action).catch((e) => {
+			instance.actionDelete(action).catch((e: any) => {
 				this.logger.silly(`action_delete to connection failed: ${e.message}`)
 			})
 		}
@@ -402,7 +414,7 @@ export default class FragmentActions extends CoreBase {
 	 * @param {string} instanceId
 	 * @access public
 	 */
-	forgetInstance(instanceId) {
+	forgetInstance(instanceId: string) {
 		let changed = false
 
 		// Cleanup any actions
@@ -460,7 +472,7 @@ export default class FragmentActions extends CoreBase {
 	 * @param {Set<string>} knownInstanceIds
 	 * @access public
 	 */
-	verifyInstanceIds(knownInstanceIds) {
+	verifyInstanceIds(knownInstanceIds: Set<string>): boolean {
 		let changed = false
 
 		// Clean out actions

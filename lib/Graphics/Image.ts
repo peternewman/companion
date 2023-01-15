@@ -47,9 +47,9 @@ class Image {
 			height = 58
 		}
 
-		this.argb = argb.bind(this)
-		this.rgb = rgb.bind(this)
-		this.rgbRev = rgbRev.bind(this)
+		// this.argb = argb.bind(this)
+		// this.rgb = rgb.bind(this)
+		// this.rgbRev = rgbRev.bind(this)
 
 		this.width = width
 		this.height = height
@@ -179,7 +179,7 @@ class Image {
 					break
 				case 'center':
 					xouter = 0
-					xinner = Math.round((png.width - width) / 2, 0)
+					xinner = Math.round((png.width - width) / 2)
 					wouter = width
 					break
 				case 'right':
@@ -197,7 +197,7 @@ class Image {
 					wouter = png.width
 					break
 				case 'center':
-					xouter = Math.round((width - png.width) / 2, 0)
+					xouter = Math.round((width - png.width) / 2)
 					xinner = 0
 					wouter = png.width
 					break
@@ -219,7 +219,7 @@ class Image {
 					break
 				case 'center':
 					youter = 0
-					yinner = Math.round((png.height - height) / 2, 0)
+					yinner = Math.round((png.height - height) / 2)
 					houter = height
 					break
 				case 'bottom':
@@ -237,7 +237,7 @@ class Image {
 					houter = png.height
 					break
 				case 'center':
-					youter = Math.round((height - png.height) / 2, 0)
+					youter = Math.round((height - png.height) / 2)
 					yinner = 0
 					houter = png.height
 					break

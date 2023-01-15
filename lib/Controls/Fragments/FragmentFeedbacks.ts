@@ -2,8 +2,8 @@ import CoreBase from '../../Core/Base.js'
 import { clamp } from '../../Resources/Util.js'
 import { cloneDeep, isEqual } from 'lodash-es'
 import { nanoid } from 'nanoid'
-import { ButtonDrawStyle, FeedbackInstance, Registry } from '../../tmp.js'
-import { CompanionAdvancedFeedbackResult, CompanionFeedbackButtonStyleResult } from '@companion-module/base'
+import type { FeedbackInstance, Registry } from '../../tmp.js'
+import type { CompanionAdvancedFeedbackResult, CompanionFeedbackButtonStyleResult } from '@companion-module/base'
 
 /**
  * Helper for ControlTypes with feedbacks
@@ -27,12 +27,12 @@ import { CompanionAdvancedFeedbackResult, CompanionFeedbackButtonStyleResult } f
  * develop commercial activities involving the Companion software without
  * disclosing the source code of your own applications.
  */
-export default class FragmentFeedbacks extends CoreBase {
+export default class FragmentFeedbacks<TStyle> extends CoreBase {
 	/**
 	 * The base style without feedbacks applied
 	 * @access public
 	 */
-	baseStyle = {}
+	baseStyle: TStyle = {} as any // TODO HACK
 
 	/**
 	 * Whether this set of feedbacks can only use boolean feedbacks
@@ -338,8 +338,8 @@ export default class FragmentFeedbacks extends CoreBase {
 				if (!definition || definition.type !== 'boolean') return false
 
 				const defaultStyle = definition.style || {}
-				const oldStyle = feedback.style || {}
-				const newStyle = {}
+				const oldStyle: Partial<CompanionFeedbackButtonStyleResult> = feedback.style || {}
+				const newStyle: Partial<CompanionFeedbackButtonStyleResult> = {}
 
 				for (const key of selected) {
 					if (key in oldStyle) {
@@ -460,7 +460,7 @@ export default class FragmentFeedbacks extends CoreBase {
 	 * @returns the unprocessed style
 	 * @access public
 	 */
-	getUnparsedStyle() {
+	getUnparsedStyle(): TStyle {
 		if (this.#booleanOnly) throw new Error('FragmentFeedbacks not setup to use styles')
 
 		let style = { ...this.baseStyle }

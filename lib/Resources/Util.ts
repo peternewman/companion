@@ -256,10 +256,15 @@ export function isPackaged(): boolean {
 	return typeof __webpack_require__ === 'function'
 }
 
+export interface Size {
+	width: number
+	height: number
+}
+
 /**
  * Get the size of the bitmap for a button
  */
-export function GetButtonBitmapSize(registry: Registry, style: ButtonStyle) {
+export function GetButtonBitmapSize(registry: Registry, style: ButtonStyle): Size {
 	let removeTopBar = !style.show_topbar
 	if (style.show_topbar === 'default' || style.show_topbar === undefined) {
 		removeTopBar = registry.userconfig.getKey('remove_topbar') === true

@@ -3,6 +3,7 @@ import CoreBase from '../Core/Base.js'
 import jsonPatch from 'fast-json-patch'
 import debounceFn from 'debounce-fn'
 import { Registry } from '../tmp.js'
+import { Size } from '../Resources/Util.js'
 
 export function ControlConfigRoom(controlId: string): string {
 	return `controls:${controlId}`
@@ -110,7 +111,7 @@ export default abstract class ControlBase<TConfigJson, TRuntimeJson = Record<str
 	 * @access public
 	 * @abstract
 	 */
-	getBitmapSize() {
+	getBitmapSize(): Size | null {
 		return null
 	}
 

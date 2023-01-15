@@ -1,9 +1,41 @@
 import ButtonControlBase from './Base.js'
-import Registry from '../../../Registry.js'
 import { cloneDeep } from 'lodash-es'
 import FragmentActions from '../../Fragments/FragmentActions.js'
 import { clamp } from '../../../Resources/Util.js'
 import { GetStepIds } from '../../../Shared/Controls.js'
+import type { ActionInstance, ButtonDrawStyleBase, Complete, FeedbackInstance, Registry } from '../../../tmp.js'
+
+interface ButtonConfig {
+	type: 'button'
+	style: ButtonDrawStyleBase
+	options: ButtonOptions
+	feedbacks: FeedbackInstance[]
+	steps: Record<
+		string,
+		{
+			action_sets: Record<string, ActionInstance[]>
+			options: StepOptions
+		}
+	>
+}
+interface ButtonRuntimeConfig {
+	current_step_id: string
+}
+
+interface SurfaceHoldState {
+	pressed: number
+	timers: NodeJS.Timer[]
+}
+
+interface ButtonOptions {
+	relativeDelay: boolean
+	stepAutoProgress: boolean
+	rotaryActions: boolean
+}
+
+interface StepOptions {
+	runWhileHeld: number[]
+}
 
 /**
  * Class for the stepped button control.
@@ -26,14 +58,32 @@ import { GetStepIds } from '../../../Shared/Controls.js'
  * develop commercial activities involving the Companion software without
  * disclosing the source code of your own applications.
  */
-export default class ControlButtonNormal extends ButtonControlBase {
+export default class ControlButtonNormal extends ButtonControlBase<
+	ButtonConfig,
+	ButtonRuntimeConfig,
+	ButtonOptions,
+	StepOptions
+> {
+	readonly type = 'button'
+	/**
+	 * The defaults options for a button
+	 * @type {Object}
+	 * @access public
+	 * @static
+	 */
+	static DefaultOptions: Complete<ButtonOptions> = {
+		relativeDelay: false,
+		stepAutoProgress: true,
+		rotaryActions: false,
+	}
+
 	/**
 	 * The defaults options for a step
 	 * @type {Object}
 	 * @access public
 	 * @static
 	 */
-	static DefaultStepOptions = {
+	static DefaultStepOptions: Complete<StepOptions> = {
 		runWhileHeld: [], // array of set ids
 	}
 
@@ -41,13 +91,13 @@ export default class ControlButtonNormal extends ButtonControlBase {
 	 * The id of the currently selected (next to be executed) step
 	 * @access private
 	 */
-	#current_step_id = '0'
+	#current_step_id: string = '0'
 
 	/**
 	 * Button hold state for each surface/deviceId
 	 * @access private
 	 */
-	surfaceHoldState = {}
+	surfaceHoldState: Record<string, SurfaceHoldState | undefined> = {}
 
 	/**
 	 * @param {Registry} registry - the application core
@@ -55,15 +105,10 @@ export default class ControlButtonNormal extends ButtonControlBase {
 	 * @param {object} storage - persisted storage object
 	 * @param {boolean} isImport - if this is importing a button, not creating at startup
 	 */
-	constructor(registry, controlId, storage, isImport) {
+	constructor(registry: Registry, controlId: string, storage: ButtonConfig, isImport: boolean) {
 		super(registry, controlId, 'stepped-button', 'Controls/Button/Normal')
 
-		this.type = 'button'
-
-		this.options = {
-			...cloneDeep(ButtonControlBase.DefaultOptions),
-			stepAutoProgress: true,
-		}
+		this.options = cloneDeep(ControlButtonNormal.DefaultOptions)
 		this.feedbacks.baseStyle = cloneDeep(ButtonControlBase.DefaultStyle)
 		this.feedbacks.feedbacks = []
 		this.steps = {
@@ -105,7 +150,7 @@ export default class ControlButtonNormal extends ButtonControlBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionAdd(stepId, setId, actionItem) {
+	actionAdd(stepId: string, setId: string, actionItem: ActionInstance) {
 		const step = this.steps[stepId]
 		if (step) {
 			return step.actionAdd(setId, actionItem)
@@ -121,7 +166,7 @@ export default class ControlButtonNormal extends ButtonControlBase {
 	 * @param {Array} newActions actions to append
 	 * @access public
 	 */
-	actionAppend(stepId, setId, newActions) {
+	actionAppend(stepId: string, setId: string, newActions: ActionInstance[]) {
 		const step = this.steps[stepId]
 		if (step) {
 			return step.actionAppend(setId, newActions)
@@ -138,7 +183,7 @@ export default class ControlButtonNormal extends ButtonControlBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionDuplicate(stepId, setId, id) {
+	actionDuplicate(stepId: string, setId: string, id: string) {
 		const step = this.steps[stepId]
 		if (step) {
 			return step.actionDuplicate(setId, id)
@@ -155,7 +200,7 @@ export default class ControlButtonNormal extends ButtonControlBase {
 	 * @param {boolean} enabled
 	 * @access public
 	 */
-	actionEnabled(stepId, setId, id, enabled) {
+	actionEnabled(stepId: string, setId: string, id: string, enabled: boolean) {
 		const step = this.steps[stepId]
 		if (step) {
 			return step.actionEnabled(setId, id, enabled)
@@ -172,7 +217,7 @@ export default class ControlButtonNormal extends ButtonControlBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	async actionLearn(stepId, setId, id) {
+	async actionLearn(stepId: string, setId: string, id: string) {
 		const step = this.steps[stepId]
 		if (step) {
 			return step.actionLearn(setId, id)
@@ -189,7 +234,7 @@ export default class ControlButtonNormal extends ButtonControlBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionRemove(stepId, setId, id) {
+	actionRemove(stepId: string, setId: string, id: string) {
 		const step = this.steps[stepId]
 		if (step) {
 			return step.actionRemove(setId, id)
@@ -209,7 +254,14 @@ export default class ControlButtonNormal extends ButtonControlBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionReorder(dragStepId, dragSetId, dragIndex, dropStepId, dropSetId, dropIndex) {
+	actionReorder(
+		dragStepId: string,
+		dragSetId: string,
+		dragIndex: number,
+		dropStepId: string,
+		dropSetId: string,
+		dropIndex: number
+	) {
 		const fromSet = this.steps[dragStepId]?.action_sets?.[dragSetId]
 		const toSet = this.steps[dropStepId]?.action_sets?.[dropSetId]
 		if (fromSet && toSet) {
@@ -244,7 +296,7 @@ export default class ControlButtonNormal extends ButtonControlBase {
 	 * @param {Array} newActions actions to populate
 	 * @access public
 	 */
-	actionReplaceAll(stepId, setId, newActions) {
+	actionReplaceAll(stepId: string, setId: string, newActions: ActionInstance[]) {
 		const step = this.steps[stepId]
 		if (step) {
 			return step.actionReplaceAll(setId, newActions)
@@ -262,7 +314,7 @@ export default class ControlButtonNormal extends ButtonControlBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionSetDelay(stepId, setId, id, delay) {
+	actionSetDelay(stepId: string, setId: string, id: string, delay: number) {
 		const step = this.steps[stepId]
 		if (step) {
 			return step.actionSetDelay(setId, id, delay)
@@ -281,7 +333,7 @@ export default class ControlButtonNormal extends ButtonControlBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionSetOption(stepId, setId, id, key, value) {
+	actionSetOption(stepId: string, setId: string, id: string, key: string, value: any) {
 		const step = this.steps[stepId]
 		if (step) {
 			return step.actionSetOption(setId, id, key, value)
@@ -295,14 +347,14 @@ export default class ControlButtonNormal extends ButtonControlBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionSetAdd(stepId) {
+	actionSetAdd(stepId: string) {
 		const step = this.steps[stepId]
 		if (step) {
 			let redraw = false
 
 			const existingKeys = Object.keys(step.action_sets)
-				.filter((k) => !isNaN(k))
 				.map((k) => Number(k))
+				.filter((k) => !isNaN(k))
 			if (existingKeys.length === 0) {
 				// add the default '1000' set
 				step.action_sets['1000'] = []
@@ -328,9 +380,9 @@ export default class ControlButtonNormal extends ButtonControlBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionSetRemove(stepId, setId) {
+	actionSetRemove(stepId: string, setId: string) {
 		// Ensure valid
-		if (isNaN(setId)) return false
+		if (isNaN(Number(setId))) return false
 
 		const step = this.steps[stepId]
 		if (step) {
@@ -374,9 +426,12 @@ export default class ControlButtonNormal extends ButtonControlBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionSetRename(stepId, oldSetId, newSetId) {
+	actionSetRename(stepId: string, oldSetId0: string, newSetId0: string) {
 		const step = this.steps[stepId]
 		if (step) {
+			const oldSetId = Number(oldSetId0)
+			const newSetId = Number(newSetId0)
+
 			// Only valid when both are numbers
 			if (isNaN(newSetId) || isNaN(oldSetId)) return false
 
@@ -389,7 +444,7 @@ export default class ControlButtonNormal extends ButtonControlBase {
 			step.action_sets[newSetId] = step.action_sets[oldSetId]
 			delete step.action_sets[oldSetId]
 
-			const runWhileHeldIndex = step.options.runWhileHeld.indexOf(Number(oldSetId))
+			const runWhileHeldIndex = step.options.runWhileHeld.indexOf(oldSetId)
 			if (runWhileHeldIndex !== -1) {
 				step.options.runWhileHeld[runWhileHeldIndex] = newSetId
 			}
@@ -402,11 +457,11 @@ export default class ControlButtonNormal extends ButtonControlBase {
 		return false
 	}
 
-	actionSetRunWhileHeld(stepId, setId, runWhileHeld) {
+	actionSetRunWhileHeld(stepId: string, setId0: string, runWhileHeld: boolean) {
 		const step = this.steps[stepId]
 		if (step) {
 			// Ensure it is a number
-			setId = Number(setId)
+			const setId = Number(setId0)
 
 			// Only valid when step is a number
 			if (isNaN(setId)) return false
@@ -434,7 +489,7 @@ export default class ControlButtonNormal extends ButtonControlBase {
 	 * @returns {number} The index of current step
 	 * @access public
 	 */
-	getActiveStepIndex() {
+	getActiveStepIndex(): number | undefined {
 		const out = GetStepIds(this.steps).indexOf(this.#current_step_id)
 		return out !== -1 ? out : undefined
 	}
@@ -448,13 +503,16 @@ export default class ControlButtonNormal extends ButtonControlBase {
 		const style = super.getDrawStyle()
 
 		if (GetStepIds(this.steps).length > 1) {
-			style.step_cycle = this.getActiveStepIndex() + 1
+			style.step_cycle = (this.getActiveStepIndex() || 0) + 1
 		}
 
 		return style
 	}
 
-	#getNewStepValue(existingActions, existingOptions) {
+	#getNewStepValue(
+		existingActions?: Record<string, ActionInstance[]>,
+		existingOptions?: StepOptions
+	): FragmentActions<StepOptions> {
 		const action_sets = existingActions || {}
 		const options = existingOptions || cloneDeep(ControlButtonNormal.DefaultStepOptions)
 
@@ -466,7 +524,7 @@ export default class ControlButtonNormal extends ButtonControlBase {
 			action_sets.rotate_right = action_sets.rotate_right || []
 		}
 
-		const actions = new FragmentActions(
+		const actions = new FragmentActions<StepOptions>(
 			this.registry,
 			this.controlId,
 			this.commitChange.bind(this),
@@ -483,7 +541,7 @@ export default class ControlButtonNormal extends ButtonControlBase {
 	 * Update an option field of this control
 	 * @access public
 	 */
-	optionsSetField(key, value) {
+	optionsSetField<K extends keyof ButtonOptions>(key: K, value: ButtonOptions[K]) {
 		// Check if rotary_actions should be added/remove
 		if (key === 'rotaryActions') {
 			for (const step of Object.values(this.steps)) {
@@ -510,9 +568,9 @@ export default class ControlButtonNormal extends ButtonControlBase {
 	 * @param {string | undefined} deviceId The surface that intiated this press
 	 * @access public
 	 */
-	pressControl(pressed, deviceId) {
+	pressControl(pressed: boolean, deviceId: string | undefined) {
 		let pressedDuration = 0
-		let holdState = undefined
+		let holdState: SurfaceHoldState | undefined = undefined
 		if (deviceId) {
 			// Calculate the press duration, or track when the press started
 			if (pressed) {
@@ -548,7 +606,7 @@ export default class ControlButtonNormal extends ButtonControlBase {
 				}
 			}
 
-			const step = this.steps[this_step_id]
+			const step = this_step_id && this.steps[this_step_id]
 			if (step) {
 				let action_set_id = pressed ? 'down' : 'up'
 
@@ -559,11 +617,11 @@ export default class ControlButtonNormal extends ButtonControlBase {
 						.map((id) => Number(id))
 						.filter((id) => !isNaN(id) && id < pressedDuration)
 					if (setIds.length) {
-						action_set_id = Math.max(...setIds)
+						action_set_id = Math.max(...setIds) + ''
 					}
 				}
 
-				const runActionSet = (set_id) => {
+				const runActionSet = (set_id: string) => {
 					const actions = step.action_sets[set_id]
 					if (actions) {
 						this.logger.silly('found actions')
@@ -582,7 +640,7 @@ export default class ControlButtonNormal extends ButtonControlBase {
 						holdState.timers.push(
 							setTimeout(() => {
 								try {
-									runActionSet(time)
+									runActionSet(time + '')
 								} catch (e) {
 									this.logger.warn(`hold actions execution failed: ${e}`)
 								}
@@ -592,7 +650,7 @@ export default class ControlButtonNormal extends ButtonControlBase {
 				}
 
 				// Run the actions if it wasn't already run from being held
-				if (!step.options.runWhileHeld.includes(action_set_id)) {
+				if (!step.options.runWhileHeld.includes(Number(action_set_id))) {
 					runActionSet(action_set_id)
 				}
 			}
@@ -606,10 +664,10 @@ export default class ControlButtonNormal extends ButtonControlBase {
 	 * @access public
 	 * @abstract
 	 */
-	rotateControl(direction, deviceId) {
+	rotateControl(direction: boolean, deviceId: string | undefined) {
 		const [this_step_id] = this.#validateCurrentStepId()
 
-		const step = this.steps[this_step_id]
+		const step = this_step_id && this.steps[this_step_id]
 		if (step) {
 			const action_set_id = direction ? 'rotate_right' : 'rotate_left'
 
@@ -661,7 +719,7 @@ export default class ControlButtonNormal extends ButtonControlBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	stepAdvanceDelta(amount) {
+	stepAdvanceDelta(amount: number) {
 		if (amount && typeof amount === 'number') {
 			const all_steps = GetStepIds(this.steps)
 			if (all_steps.length > 0) {
@@ -685,7 +743,7 @@ export default class ControlButtonNormal extends ButtonControlBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	stepMakeCurrent(index) {
+	stepMakeCurrent(index: number) {
 		if (typeof index === 'number') {
 			const stepId = GetStepIds(this.steps)[index - 1]
 			if (stepId !== undefined) {
@@ -702,7 +760,7 @@ export default class ControlButtonNormal extends ButtonControlBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	stepRemove(stepId) {
+	stepRemove(stepId: string) {
 		const oldKeys = GetStepIds(this.steps)
 
 		if (oldKeys.length > 1) {
@@ -741,10 +799,10 @@ export default class ControlButtonNormal extends ButtonControlBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	stepSelectNext(stepId) {
+	stepSelectNext(stepId: string) {
 		if (this.steps[stepId]) {
 			// Ensure it isn't currently pressed
-			this.setPushed(false)
+			this.setPushed(false, undefined)
 
 			this.#current_step_id = stepId
 
@@ -765,7 +823,7 @@ export default class ControlButtonNormal extends ButtonControlBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	stepSwap(stepId1, stepId2) {
+	stepSwap(stepId1: string, stepId2: string) {
 		if (this.steps[stepId1] && this.steps[stepId2]) {
 			const tmp = this.steps[stepId1]
 			this.steps[stepId1] = this.steps[stepId2]
@@ -785,8 +843,8 @@ export default class ControlButtonNormal extends ButtonControlBase {
 	 * @param {boolean} clone - Whether to return a cloned object
 	 * @access public
 	 */
-	toJSON(clone = true) {
-		const stepsJson = {}
+	toJSON(clone = true): ButtonConfig {
+		const stepsJson: ButtonConfig['steps'] = {}
 		for (const [id, step] of Object.entries(this.steps)) {
 			stepsJson[id] = {
 				action_sets: step.action_sets,
@@ -800,7 +858,7 @@ export default class ControlButtonNormal extends ButtonControlBase {
 			options: this.options,
 			feedbacks: this.feedbacks.feedbacks,
 			steps: stepsJson,
-		}
+		} satisfies ButtonConfig
 
 		return clone ? cloneDeep(obj) : obj
 	}
@@ -810,13 +868,13 @@ export default class ControlButtonNormal extends ButtonControlBase {
 	 * @access public
 	 * @override
 	 */
-	toRuntimeJSON() {
+	toRuntimeJSON(): ButtonRuntimeConfig {
 		return {
 			current_step_id: this.#current_step_id,
 		}
 	}
 
-	#validateCurrentStepId() {
+	#validateCurrentStepId(): [string | null, string | null] {
 		const this_step_raw = this.#current_step_id
 		const stepIds = GetStepIds(this.steps)
 		if (stepIds.length > 0) {

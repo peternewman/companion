@@ -1,9 +1,14 @@
 import ControlBase from '../../ControlBase.js'
-import { rgb, GetButtonBitmapSize } from '../../../Resources/Util.js'
+import { rgb, GetButtonBitmapSize, Size } from '../../../Resources/Util.js'
 import { ParseControlId } from '../../../Shared/ControlId.js'
 import { cloneDeep } from 'lodash-es'
 import FragmentActions from '../../Fragments/FragmentActions.js'
 import FragmentFeedbacks from '../../Fragments/FragmentFeedbacks.js'
+import type { BankStatus, ButtonDrawStyle, ButtonDrawStyleBase, Registry } from '../../../tmp.js'
+
+export interface ButtonControlBaseOptions {
+	relativeDelay: boolean
+}
 
 /**
  * Abstract class for a editable button control.
@@ -27,76 +32,74 @@ import FragmentFeedbacks from '../../Fragments/FragmentFeedbacks.js'
  * develop commercial activities involving the Companion software without
  * disclosing the source code of your own applications.
  */
-export default class ButtonControlBase extends ControlBase {
+export default abstract class ButtonControlBase<TConfigJson, TRuntimeJson, TOptions, TStepOptions> extends ControlBase<
+	TConfigJson,
+	TRuntimeJson
+> {
 	/**
 	 * The defaults style for a button
 	 * @type {Object}
 	 * @access public
 	 * @static
 	 */
-	static DefaultStyle = {
+	static DefaultStyle: ButtonDrawStyleBase = {
 		text: '',
 		size: 'auto',
-		png: null,
+		png64: null,
 		alignment: 'center:center',
 		pngalignment: 'center:center',
 		color: rgb(255, 255, 255),
 		bgcolor: rgb(0, 0, 0),
 		show_topbar: 'default',
-	}
-	/**
-	 * The defaults options for a button
-	 * @type {Object}
-	 * @access public
-	 * @static
-	 */
-	static DefaultOptions = {
-		relativeDelay: false,
+		imageBuffers: [],
+		textExpression: false,
 	}
 
 	/**
 	 * The feedbacks fragment
 	 * @access public
 	 */
-	feedbacks
+	feedbacks: FragmentFeedbacks<ButtonDrawStyleBase>
 
 	/**
 	 * The current status of this button
 	 * @access protected
 	 */
-	bank_status = 'good'
+	bank_status: BankStatus = 'good'
 
-	/**
-	 * The base style of this button
-	 * @access protected
-	 */
-	style = {}
+	// /**
+	//  * The base style of this button
+	//  * @access protected
+	//  */
+	// style = {}
 
 	/**
 	 * The config of this button
 	 */
-	options = {}
+	options: TOptions = {} as any // TODO HACK
 
 	/**
 	 * Whether this button has delayed actions running
 	 * @access protected
 	 */
-	has_actions_running = false
+	has_actions_running: boolean = false
 
 	/**
 	 * Whether this button is currently pressed
 	 * @access protected
 	 */
-	pushed = false
+	pushed: boolean = false
 
 	/**
 	 * The variabls referenced in the last draw. Whenever one of these changes, a redraw should be performed
 	 * @access protected
 	 * @type {Set | null}
 	 */
-	last_draw_variables = null
+	last_draw_variables: Set<string> | null = null
 
-	constructor(registry, controlId, logSource, debugNamespace) {
+	steps: Record<string, FragmentActions<TStepOptions>>
+
+	constructor(registry: Registry, controlId: string, logSource: string, debugNamespace: string) {
 		super(registry, controlId, logSource, debugNamespace)
 
 		this.feedbacks = new FragmentFeedbacks(
@@ -106,6 +109,7 @@ export default class ButtonControlBase extends ControlBase {
 			this.triggerRedraw.bind(this),
 			false
 		)
+		this.steps = {}
 	}
 
 	/**
@@ -114,11 +118,11 @@ export default class ButtonControlBase extends ControlBase {
 	 * @returns {boolean} whether the status changed
 	 * @access public
 	 */
-	checkButtonStatus(redraw = true) {
+	checkButtonStatus(redraw = true): boolean {
 		// Find all the instances referenced by the bank
 		const instance_ids = new Set()
 		for (const step of Object.values(this.steps)) {
-			for (const actions in Object.values(step.action_sets)) {
+			for (const actions of Object.values(step.action_sets)) {
 				for (const action of actions) {
 					instance_ids.add(action.instance)
 				}
@@ -126,7 +130,7 @@ export default class ButtonControlBase extends ControlBase {
 		}
 
 		// Figure out the combined status
-		let status = 'good'
+		let status: BankStatus = 'good'
 		for (const instance_id of instance_ids) {
 			const instance_status = this.instance.getInstanceStatus(instance_id)
 			if (instance_status) {
@@ -173,7 +177,7 @@ export default class ButtonControlBase extends ControlBase {
 	 * @param {string} instanceId
 	 * @access public
 	 */
-	forgetInstance(instanceId) {
+	forgetInstance(instanceId: string) {
 		const changedFeedbacks = this.feedbacks.forgetInstance(instanceId)
 
 		let changedSteps = false
@@ -209,7 +213,7 @@ export default class ButtonControlBase extends ControlBase {
 	 * @access public
 	 * @abstract
 	 */
-	getBitmapSize() {
+	getBitmapSize(): Size {
 		return GetButtonBitmapSize(this.registry, this.feedbacks.baseStyle)
 	}
 
@@ -218,7 +222,7 @@ export default class ButtonControlBase extends ControlBase {
 	 * @returns the processed style of the button
 	 * @access public
 	 */
-	getDrawStyle() {
+	getDrawStyle(): ButtonDrawStyle {
 		let style = this.feedbacks.getUnparsedStyle()
 
 		if (style.text) {
@@ -240,12 +244,18 @@ export default class ButtonControlBase extends ControlBase {
 			}
 		}
 
-		style.pushed = !!this.pushed
-		style.action_running = this.has_actions_running
-		style.bank_status = this.bank_status
+		return cloneDeep({
+			...style,
 
-		style.style = this.type
-		return cloneDeep(style)
+			pushed: !!this.pushed,
+			action_running: this.has_actions_running,
+			bank_status: this.bank_status,
+
+			style: 'button',
+
+			cloud: false,
+			step_cycle: undefined,
+		} satisfies ButtonDrawStyle)
 	}
 
 	/**
@@ -253,7 +263,7 @@ export default class ButtonControlBase extends ControlBase {
 	 * @param {Array<string>} allChangedVariables - variables with changes
 	 * @access public
 	 */
-	onVariablesChanged(allChangedVariables) {
+	onVariablesChanged(allChangedVariables: string[]) {
 		if (this.last_draw_variables) {
 			for (const variable of allChangedVariables) {
 				if (this.last_draw_variables.has(variable)) {
@@ -270,7 +280,7 @@ export default class ButtonControlBase extends ControlBase {
 	 * Update an option field of this control
 	 * @access public
 	 */
-	optionsSetField(key, value) {
+	optionsSetField<K extends keyof TOptions>(key: K, value: TOptions[K]) {
 		this.options[key] = value
 
 		this.commitChange()
@@ -307,9 +317,7 @@ export default class ButtonControlBase extends ControlBase {
 	 * @access public
 	 * @abstract
 	 */
-	pressControl(pressed, deviceId) {
-		throw new Error('must be implemented by subclass!')
-	}
+	abstract pressControl(pressed: boolean, deviceId: string | undefined): void
 
 	/**
 	 * Rename an instance for variables used in this control
@@ -317,7 +325,7 @@ export default class ButtonControlBase extends ControlBase {
 	 * @param {string} tolabel - the new instance short name
 	 * @access public
 	 */
-	renameVariables(labelFrom, labelTo) {
+	renameVariables(labelFrom: string, labelTo: string) {
 		if (this.feedbacks.baseStyle?.text) {
 			const result = this.instance.variable.renameVariablesInString(this.feedbacks.baseStyle.text, labelFrom, labelTo)
 			if (this.feedbacks.baseStyle.text !== result) {
@@ -333,11 +341,11 @@ export default class ButtonControlBase extends ControlBase {
 	 * @param {boolean} skip_up Mark the button as released, skipping the release actions
 	 * @access public
 	 */
-	setActionsRunning(running, skip_up) {
+	setActionsRunning(running: boolean, skip_up = false) {
 		this.has_actions_running = running
 
 		if (skip_up) {
-			this.setPushed(false)
+			this.setPushed(false, undefined)
 		}
 
 		this.triggerRedraw()
@@ -350,7 +358,7 @@ export default class ButtonControlBase extends ControlBase {
 	 * @returns {boolean} the pushed state changed
 	 * @access public
 	 */
-	setPushed(direction, deviceId) {
+	setPushed(direction: boolean, deviceId: string | undefined) {
 		const wasPushed = this.pushed
 		// Record is as pressed
 		this.pushed = !!direction
@@ -377,7 +385,7 @@ export default class ButtonControlBase extends ControlBase {
 	 * @returns {boolean} true if any changes were made
 	 * @access public
 	 */
-	styleSetFields(diff) {
+	styleSetFields(diff: Partial<ButtonDrawStyleBase>) {
 		if (diff.png64) {
 			// Strip the prefix off the base64 png
 			if (typeof diff.png64 === 'string' && diff.png64.match(/data:.*?image\/png/)) {
@@ -412,7 +420,7 @@ export default class ButtonControlBase extends ControlBase {
 	 * @param {Set<string>} knownInstanceIds
 	 * @access public
 	 */
-	verifyInstanceIds(knownInstanceIds) {
+	verifyInstanceIds(knownInstanceIds: Set<string>) {
 		const changedFeedbacks = this.feedbacks.verifyInstanceIds(knownInstanceIds)
 
 		let changedSteps = false

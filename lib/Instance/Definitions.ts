@@ -231,7 +231,7 @@ class InstanceDefinitions extends CoreBase {
 	createActionItem(instanceId: string, actionId: string) {
 		const definition = this.getActionDefinition(instanceId, actionId)
 		if (definition) {
-			const action = {
+			const action: ActionInstance = {
 				id: nanoid(),
 				action: actionId,
 				instance: instanceId,

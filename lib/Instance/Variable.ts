@@ -133,8 +133,14 @@ class InstanceVariable extends CoreBase {
 	 * @param {string | undefined} requiredType - Fail if the result is not of specified type
 	 * @returns boolean/number/string result of the expression
 	 */
-	parseExpression(str: string, requiredType: 'boolean' | 'number' | 'string' | undefined) {
-		const referencedVariableIds = new Set()
+	parseExpression(
+		str: string,
+		requiredType: 'boolean' | 'number' | 'string' | undefined
+	): {
+		value: any
+		variableIds: Set<string>
+	} {
+		const referencedVariableIds = new Set<string>()
 
 		const getVariableValue = (variableId: string) => {
 			const result = this.parseVariables(`$(${variableId})`)
@@ -158,7 +164,7 @@ class InstanceVariable extends CoreBase {
 		}
 	}
 
-	forgetInstance(id: string, label: string) {
+	forgetInstance(_id: string, label: string) {
 		if (label !== undefined) {
 			if (this.variable_values[label] !== undefined) {
 				const removed_variables = []
