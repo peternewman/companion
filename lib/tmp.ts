@@ -106,6 +106,8 @@ export interface ActionInstance {
 	delay: number
 
 	disabled?: boolean
+
+	upgradeIndex?: number
 }
 
 export interface FeedbackInstance {
@@ -117,6 +119,8 @@ export interface FeedbackInstance {
 	style?: Partial<CompanionFeedbackButtonStyleResult>
 
 	disabled?: boolean
+
+	upgradeIndex?: number
 }
 
 export interface TriggerEventInstance {
@@ -124,4 +128,9 @@ export interface TriggerEventInstance {
 	type: string
 	enabled: boolean
 	options: Record<string, any>
+}
+
+export interface VariableDefinition {
+	label: string
+	name: string
 }

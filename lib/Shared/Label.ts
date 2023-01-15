@@ -3,7 +3,7 @@
  * @param {string} label Label to check
  * @returns 'safe' version of the label
  */
-export function makeLabelSafe(label) {
+export function makeLabelSafe(label: string): string {
 	return label.replace(/[^\w-]/gi, '_')
 }
 
@@ -12,7 +12,7 @@ export function makeLabelSafe(label) {
  * @param {string} label Label to check
  * @returns
  */
-export function isLabelValid(label) {
+export function isLabelValid(label: string): boolean {
 	if (!label || typeof label !== 'string') return false
 
 	// Check a few reserved words

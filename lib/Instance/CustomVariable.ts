@@ -219,7 +219,7 @@ export default class InstanceCustomVariable extends CoreBase {
 			const fullname = `${custom_variable_prefix}${name}`
 			const value = this.base.getVariableValue('internal', fullname)
 
-			this.custom_variables[name].defaultValue = value
+			this.custom_variables[name].defaultValue = value as any // TODO HACK
 		}
 
 		this.doSave()
@@ -266,7 +266,7 @@ export default class InstanceCustomVariable extends CoreBase {
 			const fullname = `${custom_variable_prefix}${name}`
 			const value = this.base.getVariableValue('internal', fullname)
 			this.logger.silly(`Set default value "${name}":${value}`)
-			this.custom_variables[name].defaultValue = value
+			this.custom_variables[name].defaultValue = (value as any) || '' // TODO HACK
 
 			this.doSave()
 

@@ -4,6 +4,7 @@ import { cloneDeep, isEqual } from 'lodash-es'
 import { nanoid } from 'nanoid'
 import type { FeedbackInstance, Registry } from '../../tmp.js'
 import type { CompanionAdvancedFeedbackResult, CompanionFeedbackButtonStyleResult } from '@companion-module/base'
+import { FeedbackInstanceBase } from '@companion-module/base/dist/host-api/api.js'
 
 /**
  * Helper for ControlTypes with feedbacks
@@ -269,7 +270,7 @@ export default class FragmentFeedbacks<TStyle> extends CoreBase {
 	 * @param {object} newProps
 	 * @access public
 	 */
-	feedbackReplace(newProps) {
+	feedbackReplace(newProps: FeedbackInstanceBase & { style?: Partial<CompanionFeedbackButtonStyleResult> }) {
 		for (const feedback of this.feedbacks) {
 			// Replace the new feedback in place
 			if (feedback.id === newProps.id) {

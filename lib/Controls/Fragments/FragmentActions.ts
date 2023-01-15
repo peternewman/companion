@@ -2,6 +2,7 @@ import CoreBase from '../../Core/Base.js'
 import { cloneDeep } from 'lodash-es'
 import { nanoid } from 'nanoid'
 import type { ActionInstance, Registry } from '../../tmp.js'
+import { ActionInstanceBase } from '@companion-module/base/dist/host-api/api.js'
 
 /**
  * Helper for ControlTypes with actions
@@ -253,7 +254,7 @@ export default class FragmentActions<TOptions = Record<string, never>> extends C
 	 * @param {object} newProps
 	 * @access public
 	 */
-	actionReplace(newProps) {
+	actionReplace(newProps: ActionInstanceBase) {
 		for (const action_set of Object.values(this.action_sets)) {
 			for (const action of action_set) {
 				// Replace the new action in place

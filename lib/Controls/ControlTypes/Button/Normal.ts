@@ -4,8 +4,9 @@ import FragmentActions from '../../Fragments/FragmentActions.js'
 import { clamp } from '../../../Resources/Util.js'
 import { GetStepIds } from '../../../Shared/Controls.js'
 import type { ActionInstance, ButtonDrawStyleBase, Complete, FeedbackInstance, Registry } from '../../../tmp.js'
+import { ActionInstanceBase } from '@companion-module/base/dist/host-api/api.js'
 
-interface ButtonConfig {
+export interface ButtonConfig {
 	type: 'button'
 	style: ButtonDrawStyleBase
 	options: ButtonOptions
@@ -283,7 +284,8 @@ export default class ControlButtonNormal extends ButtonControlBase<
 	 * @param {object} newProps
 	 * @access public
 	 */
-	actionReplace(newProps) {
+	actionReplace(newProps: ActionInstanceBase) {
+		// TODO - use better type
 		for (const step of Object.values(this.steps)) {
 			step.actionReplace(newProps)
 		}

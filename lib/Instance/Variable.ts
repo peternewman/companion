@@ -19,7 +19,7 @@ import LogController from '../Log/Controller.js'
 import CoreBase from '../Core/Base.js'
 import InstanceCustomVariable from './CustomVariable.js'
 import jsonPatch from 'fast-json-patch'
-import type { Registry, SocketClient } from '../tmp.js'
+import type { Registry, SocketClient, VariableDefinition } from '../tmp.js'
 import { ResolveExpression } from '../Shared/Expression/ExpressionResolve.js'
 import { ParseExpression } from '../Shared/Expression/ExpressionParse.js'
 import { ExpressionFunctions } from '../Shared/Expression/ExpressionFunctions.js'
@@ -27,6 +27,11 @@ import { ExpressionFunctions } from '../Shared/Expression/ExpressionFunctions.js
 const logger = LogController.createLogger('Instance/Variable')
 
 const VariableDefinitionsRoom = 'variable-definitions'
+
+export interface VariableDefinition2 {
+	label: string
+	// name: string
+}
 
 // Export for unit tests
 export function parseVariablesInString(
@@ -96,8 +101,8 @@ export function parseVariablesInString(
 }
 
 class InstanceVariable extends CoreBase {
-	variable_definitions: Record<string, unknown>
-	variable_values: Record<string, Record<string, string | number | boolean | undefined>>
+	variable_definitions: Record<string, Record<string, VariableDefinition2 | undefined> | undefined>
+	variable_values: Record<string, Record<string, string | number | boolean | undefined> | undefined>
 
 	custom: InstanceCustomVariable
 
@@ -135,7 +140,7 @@ class InstanceVariable extends CoreBase {
 	 */
 	parseExpression(
 		str: string,
-		requiredType: 'boolean' | 'number' | 'string' | undefined
+		requiredType?: 'boolean' | 'number' | 'string'
 	): {
 		value: any
 		variableIds: Set<string>
@@ -166,10 +171,11 @@ class InstanceVariable extends CoreBase {
 
 	forgetInstance(_id: string, label: string) {
 		if (label !== undefined) {
-			if (this.variable_values[label] !== undefined) {
+			const variablesforLabel = this.variable_values[label]
+			if (variablesforLabel !== undefined) {
 				const removed_variables = []
-				for (let variable in this.variable_values[label]) {
-					this.variable_values[label][variable] = undefined
+				for (let variable in variablesforLabel) {
+					variablesforLabel[variable] = undefined
 					removed_variables.push(`${label}:${variable}`)
 				}
 				this.#emitVariablesChanged({}, removed_variables)
@@ -189,24 +195,26 @@ class InstanceVariable extends CoreBase {
 	 * @param {object} presets
 	 */
 	instanceLabelRename(labelFrom: string, labelTo: string) {
-		if (this.variable_values[labelTo] === undefined) {
-			this.variable_values[labelTo] = {}
+		const variablesForLabelFrom = this.variable_values[labelFrom]
+		let variablesForLabelTo = this.variable_values[labelTo]
+		if (!variablesForLabelTo) {
+			this.variable_values[labelTo] = variablesForLabelTo = {}
 		}
 
 		// Trigger any renames inside of the banks
 		this.controls.renameVariables(labelFrom, labelTo)
 
 		// Move variable values, and track the 'diff'
-		if (this.variable_values[labelFrom] !== undefined) {
+		if (variablesForLabelFrom) {
 			const changed_variables: Record<string, any> = {}
 			const removed_variables: string[] = []
 
-			for (let variable in this.variable_values[labelFrom]) {
-				this.variable_values[labelTo][variable] = this.variable_values[labelFrom][variable]
-				delete this.variable_values[labelFrom][variable]
+			for (let variable in variablesForLabelFrom) {
+				variablesForLabelTo[variable] = variablesForLabelFrom[variable]
+				delete variablesForLabelFrom[variable]
 
 				removed_variables.push(`${labelFrom}:${variable}`)
-				changed_variables[`${labelTo}:${variable}`] = this.variable_values[labelTo][variable]
+				changed_variables[`${labelTo}:${variable}`] = variablesForLabelTo[variable]
 			}
 
 			delete this.variable_values[labelFrom]
@@ -257,14 +265,13 @@ class InstanceVariable extends CoreBase {
 	 * @param {string} instance_label
 	 * @param {object} variables
 	 */
-	setVariableDefinitions(instance_label: string, variables) {
-		const variablesObj = {}
-		for (const variable of variables || []) {
+	setVariableDefinitions(instance_label: string, variables: VariableDefinition[]) {
+		const variablesObj: Record<string, VariableDefinition2> = {}
+		for (const rawVariable of variables || []) {
 			// Prune out the name
-			const newVarObj = { ...variable }
-			delete newVarObj.name
-
-			variablesObj[variable.name] = newVarObj
+			variablesObj[rawVariable.name] = {
+				label: rawVariable.label,
+			} satisfies VariableDefinition2
 		}
 
 		const variablesBefore = this.variable_definitions[instance_label]
@@ -278,8 +285,9 @@ class InstanceVariable extends CoreBase {
 	}
 
 	setVariableValues(label: string, variables: Record<string, any>) {
-		if (this.variable_values[label] === undefined) {
-			this.variable_values[label] = {}
+		let variablesforLabel = this.variable_values[label]
+		if (!variablesforLabel) {
+			this.variable_values[label] = variablesforLabel = {}
 		}
 
 		const changed_variables: Record<string, any> = {}
@@ -287,8 +295,8 @@ class InstanceVariable extends CoreBase {
 		for (const variable in variables) {
 			const value = variables[variable]
 
-			if (this.variable_values[label][variable] != value) {
-				this.variable_values[label][variable] = value
+			if (variablesforLabel[variable] != value) {
+				variablesforLabel[variable] = value
 
 				if (value === undefined) {
 					removed_variables.push(`${label}:${variable}`)

@@ -12,6 +12,8 @@ import {
 	CompanionPresetAction,
 	CompanionButtonPresetDefinition as ModulePresetDefinition,
 } from '@companion-module/base'
+import ControlButtonNormal, { ButtonConfig } from '../Controls/ControlTypes/Button/Normal.js'
+import ButtonControlBase from '../Controls/ControlTypes/Button/Base.js'
 
 const PresetsRoom = 'presets'
 const ActionsRoom = 'action-definitions'
@@ -58,6 +60,8 @@ export interface ButtonPresetStepActions {
 	up: PresetAction[]
 	rotate_left?: PresetAction[]
 	rotate_right?: PresetAction[]
+
+	[delay: number]: PresetAction[] | undefined
 }
 export interface PresetAction {
 	/** The id of the action definition */
@@ -364,26 +368,48 @@ class InstanceDefinitions extends CoreBase {
 	 * @access public
 	 */
 	importPresetToBank(instanceId: string, preset_id: string, page: number, bank: number) {
-		const definition = cloneDeep(this.#presetDefinitions[instanceId]?.[preset_id])
-		if (definition) {
-			if (definition.steps) {
-				const newSteps = {}
-				for (let i = 0; i < definition.steps.length; i++) {
-					newSteps[i] = { action_sets: definition.steps[i] }
-					for (let set in definition.steps[i]) {
-						const actions_set = definition.steps[i][set]
-						for (const action of actions_set) {
-							action.id = nanoid()
-							action.instance = instanceId
-							action.delay = action.delay ?? 0
-						}
-					}
-				}
-				definition.steps = newSteps
+		const rawPreset = this.#presetDefinitions[instanceId]?.[preset_id]
+		if (rawPreset) {
+			const definition: ButtonConfig = {
+				type: 'button',
+				style: cloneDeep({
+					...ControlButtonNormal.DefaultStyle,
+					...(rawPreset.style as any), // TODO HACK
+				}),
+				options: cloneDeep({
+					...ControlButtonNormal.DefaultOptions,
+					...rawPreset.options,
+				}),
+				feedbacks: [],
+				steps: {},
 			}
 
-			if (definition.feedbacks) {
-				definition.feedbacks = definition.feedbacks.map(
+			if (rawPreset.steps) {
+				for (let i = 0; i < rawPreset.steps.length; i++) {
+					const action_sets: Record<string, ActionInstance[]> = {}
+
+					for (let set in rawPreset.steps[i]) {
+						const rawSet = rawPreset.steps[i][set]
+						if (rawSet) {
+							action_sets[set] = rawSet.map((act) => ({
+								id: nanoid(),
+								instance: instanceId,
+								action: act.action,
+								delay: act.delay ?? 0,
+								options: act.options,
+							}))
+						}
+					}
+
+					definition.steps[i] = {
+						action_sets: action_sets,
+						options: cloneDeep(ControlButtonNormal.DefaultStepOptions),
+					}
+				}
+			}
+
+			if (rawPreset.feedbacks) {
+				definition.feedbacks = rawPreset.feedbacks.map(
 					(fb) =>
 						({
 							id: nanoid(),
@@ -393,16 +419,14 @@ class InstanceDefinitions extends CoreBase {
 							style: fb.style,
 						} satisfies FeedbackInstance)
 				)
-			} else {
-				definition.feedbacks = []
 			}
 
-			if (!definition.options) {
+			if (!rawPreset.options) {
 				// TODO - how is this possible?
-				definition.options = {}
+				rawPreset.options = {}
 			}
 
-			this.controls.importControl(CreateBankControlId(page, bank), definition)
+			this.controls.importControl(CreateBankControlId(page, bank), rawPreset)
 		}
 	}
 
@@ -463,6 +487,7 @@ class InstanceDefinitions extends CoreBase {
 								rotate_right: rawPreset.options?.rotaryActions
 									? convertPresetActions(step.rotate_right || [])
 									: undefined,
+								// TODO - delay groups
 							} satisfies Complete<ButtonPresetStepActions>)
 					),
 				}

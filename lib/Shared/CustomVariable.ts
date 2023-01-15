@@ -3,7 +3,7 @@
  * @param {string} name Custom variable to check
  * @returns 'safe' version of the customvariable
  */
-export function makeCustomVariableSafe(name) {
+export function makeCustomVariableSafe(name: string): string {
 	return name.replace(/[^\w]/gi, '_')
 }
 
@@ -12,7 +12,7 @@ export function makeCustomVariableSafe(name) {
  * @param {string} name Custom variable to check
  * @returns
  */
-export function isCustomVariableValid(name) {
+export function isCustomVariableValid(name: string): boolean {
 	if (!name || typeof name !== 'string') return false
 
 	const safeLabel = makeCustomVariableSafe(name)
