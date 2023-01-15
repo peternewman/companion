@@ -15,17 +15,28 @@
  *
  */
 
-import { parse, resolve } from '@estilles/expression-parser'
 import CoreBase from '../Core/Base.js'
 import jsonPatch from 'fast-json-patch'
 import { isCustomVariableValid } from '../Shared/CustomVariable.js'
+import { Registry, SocketClient } from '../tmp.js'
+import type InstanceVariable from './Variable.js'
 
 const custom_variable_prefix = `custom_`
 
 const CustomVariablesRoom = 'custom-variables'
 
+interface CustomVariableDefinition {
+	description: string
+	defaultValue: string
+	persistCurrentValue: boolean
+}
+
 export default class InstanceCustomVariable extends CoreBase {
-	constructor(registry, base) {
+	readonly base: InstanceVariable
+
+	custom_variables: Record<string, CustomVariableDefinition>
+
+	constructor(registry: Registry, base: InstanceVariable) {
 		super(registry, 'custom-variable', 'Instance/CustomVariable')
 
 		this.base = base
@@ -38,7 +49,7 @@ export default class InstanceCustomVariable extends CoreBase {
 	 * @param {SocketIO} client - the client socket
 	 * @access public
 	 */
-	clientConnect(client) {
+	clientConnect(client: SocketClient) {
 		client.onPromise('custom-variables:subscribe', () => {
 			client.join(CustomVariablesRoom)
 
@@ -63,7 +74,7 @@ export default class InstanceCustomVariable extends CoreBase {
 	 * @returns undefined or failure reason
 	 * @access public
 	 */
-	createVariable(name, defaultVal) {
+	createVariable(name: string, defaultVal: string) {
 		if (this.custom_variables[name]) {
 			return `Variable "${name}" already exists`
 		}
@@ -101,7 +112,7 @@ export default class InstanceCustomVariable extends CoreBase {
 	 * @returns undefined or failure reason
 	 * @access public
 	 */
-	deleteVariable(name) {
+	deleteVariable(name: string) {
 		const variablesBefore = { ...this.custom_variables }
 		delete this.custom_variables[name]
 
@@ -139,7 +150,7 @@ export default class InstanceCustomVariable extends CoreBase {
 	init() {
 		// Load the startup values of custom variables
 		if (Object.keys(this.custom_variables).length > 0) {
-			const newValues = {}
+			const newValues: Record<string, string> = {}
 			for (const [name, info] of Object.entries(this.custom_variables)) {
 				newValues[`${custom_variable_prefix}${name}`] = info.defaultValue || ''
 			}
@@ -152,8 +163,8 @@ export default class InstanceCustomVariable extends CoreBase {
 	 * @param {object} custom_variables
 	 * @access public
 	 */
-	replaceDefinitions(custom_variables) {
-		const newValues = {}
+	replaceDefinitions(custom_variables: Record<string, CustomVariableDefinition> | undefined) {
+		const newValues: Record<string, string | undefined> = {}
 		// Mark the current variables as to be deleted
 		for (const name of Object.keys(this.custom_variables || {})) {
 			newValues[`${custom_variable_prefix}${name}`] = undefined
@@ -180,7 +191,7 @@ export default class InstanceCustomVariable extends CoreBase {
 	/**
 	 * Remove any custom variables
 	 */
-	reset() {
+	reset(): void {
 		const variablesBefore = this.custom_variables
 
 		this.custom_variables = {}
@@ -192,7 +203,7 @@ export default class InstanceCustomVariable extends CoreBase {
 		}
 	}
 
-	setPersistence(name, persistent) {
+	setPersistence(name: string, persistent: boolean) {
 		if (!this.custom_variables[name]) {
 			return 'Unknown name'
 		}
@@ -219,7 +230,7 @@ export default class InstanceCustomVariable extends CoreBase {
 		}
 	}
 
-	setValue(name, value) {
+	setValue(name: string, value: string) {
 		if (this.custom_variables[name]) {
 			this.logger.silly(`Set value "${name}":${value}`)
 			this.#setValueInner(name, value)
@@ -228,7 +239,7 @@ export default class InstanceCustomVariable extends CoreBase {
 		}
 	}
 
-	#setValueInner(name, value) {
+	#setValueInner(name: string, value: string | undefined) {
 		const fullname = `${custom_variable_prefix}${name}`
 		this.base.setVariableValues('internal', {
 			[fullname]: value,
@@ -237,7 +248,7 @@ export default class InstanceCustomVariable extends CoreBase {
 		this.#persistCustomVariableValue(name, value)
 	}
 
-	resetValueToDefault(name) {
+	resetValueToDefault(name: string) {
 		if (this.custom_variables[name]) {
 			const value = this.custom_variables[name].defaultValue
 			this.logger.silly(`Set value "${name}":${value}`)
@@ -245,7 +256,7 @@ export default class InstanceCustomVariable extends CoreBase {
 		}
 	}
 
-	syncValueToDefault(name) {
+	syncValueToDefault(name: string) {
 		if (this.custom_variables[name]) {
 			const variablesBefore = {
 				...this.custom_variables,
@@ -273,12 +284,12 @@ export default class InstanceCustomVariable extends CoreBase {
 	 * @returns success
 	 * @access public
 	 */
-	setValueToExpression(name, expression) {
+	setValueToExpression(name: string, expression: string) {
 		if (this.custom_variables[name]) {
 			try {
 				this.#setValueInner(name, this.base.parseNumericExpression(expression))
 				return true
-			} catch (error) {
+			} catch (error: any) {
 				this.logger.warn(`${error.toString()}, in expression: "${expression}"`)
 				return false
 			}
@@ -292,7 +303,7 @@ export default class InstanceCustomVariable extends CoreBase {
 	 * @returns undefined or failure reason
 	 * @access public
 	 */
-	setVariableDefaultValue(name, value) {
+	setVariableDefaultValue(name: string, value: string) {
 		if (!this.custom_variables[name]) {
 			return 'Unknown name'
 		}
@@ -313,10 +324,10 @@ export default class InstanceCustomVariable extends CoreBase {
 		return undefined
 	}
 
-	#persistCustomVariableValue(name, value) {
+	#persistCustomVariableValue(name: string, value: string | undefined) {
 		if (this.custom_variables[name] && this.custom_variables[name].persistCurrentValue) {
 			const variablesBefore = { ...this.custom_variables, [name]: { ...this.custom_variables[name] } }
-			this.custom_variables[name].defaultValue = value
+			this.custom_variables[name].defaultValue = value || ''
 
 			this.doSave()
 

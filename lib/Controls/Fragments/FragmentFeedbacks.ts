@@ -2,6 +2,8 @@ import CoreBase from '../../Core/Base.js'
 import { clamp } from '../../Resources/Util.js'
 import { cloneDeep, isEqual } from 'lodash-es'
 import { nanoid } from 'nanoid'
+import { ButtonDrawStyle, FeedbackInstance, Registry } from '../../tmp.js'
+import { CompanionAdvancedFeedbackResult, CompanionFeedbackButtonStyleResult } from '@companion-module/base'
 
 /**
  * Helper for ControlTypes with feedbacks
@@ -36,19 +38,19 @@ export default class FragmentFeedbacks extends CoreBase {
 	 * Whether this set of feedbacks can only use boolean feedbacks
 	 * @access private
 	 */
-	#booleanOnly
+	#booleanOnly: boolean
 
 	/**
 	 * Cached values for the feedbacks on this control
 	 * @access private
 	 */
-	#cachedFeedbackValues = {}
+	#cachedFeedbackValues: Record<string, boolean | CompanionAdvancedFeedbackResult> = {}
 
 	/**
 	 * The feedbacks on this control
 	 * @access public
 	 */
-	feedbacks = []
+	feedbacks: FeedbackInstance[] = []
 
 	/**
 	 * Whether this set of feedbacks can only use boolean feedbacks
@@ -58,13 +60,21 @@ export default class FragmentFeedbacks extends CoreBase {
 		return this.#booleanOnly
 	}
 
+	public readonly controlId: string
+	private readonly commitChange: (redraw?: boolean) => void
+	private readonly triggerRedraw: () => void
+
 	/**
 	 * @param {Registry} registry - the application core
 	 * @param {string} controlId - id of the control
-	 * @param {string} logSource
-	 * @param {string} debugNamespace
 	 */
-	constructor(registry, controlId, commitChange, triggerRedraw, booleanOnly) {
+	constructor(
+		registry: Registry,
+		controlId: string,
+		commitChange: (redraw?: boolean) => void,
+		triggerRedraw: () => void,
+		booleanOnly: boolean
+	) {
 		super(registry, 'fragment-feedbacks', 'Controls/Fragments/Feedbacks')
 
 		this.controlId = controlId
@@ -100,11 +110,11 @@ export default class FragmentFeedbacks extends CoreBase {
 	 * @param {object} fedeback the feedback being removed
 	 * @access private
 	 */
-	#cleanupFeedback(feedback) {
+	#cleanupFeedback(feedback: FeedbackInstance) {
 		// Inform relevant module
 		const instance = this.instance.moduleHost.getChild(feedback.instance_id)
 		if (instance) {
-			instance.feedbackDelete(feedback).catch((e) => {
+			instance.feedbackDelete(feedback).catch((e: any) => {
 				this.logger.silly(`feedback_delete to connection failed: ${e.message}`)
 			})
 		}
@@ -129,7 +139,7 @@ export default class FragmentFeedbacks extends CoreBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	feedbackAdd(feedbackItem) {
+	feedbackAdd(feedbackItem: FeedbackInstance) {
 		this.feedbacks.push(feedbackItem)
 
 		// Inform relevant module
@@ -146,7 +156,7 @@ export default class FragmentFeedbacks extends CoreBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	feedbackDuplicate(id) {
+	feedbackDuplicate(id: string) {
 		const index = this.feedbacks.findIndex((fb) => fb.id === id)
 		if (index !== -1) {
 			const feedbackItem = cloneDeep(this.feedbacks[index])
@@ -164,7 +174,7 @@ export default class FragmentFeedbacks extends CoreBase {
 		return false
 	}
 
-	feedbackEnabled(id, enabled) {
+	feedbackEnabled(id: string, enabled: boolean): boolean {
 		for (const feedback of this.feedbacks) {
 			if (feedback && feedback.id === id) {
 				if (!feedback.options) feedback.options = {}
@@ -196,7 +206,7 @@ export default class FragmentFeedbacks extends CoreBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	async feedbackLearn(id) {
+	async feedbackLearn(id: string) {
 		const feedback = this.feedbacks.find((fb) => fb.id === id)
 		if (feedback) {
 			const instance = this.instance.moduleHost.getChild(feedback.instance_id)
@@ -223,7 +233,7 @@ export default class FragmentFeedbacks extends CoreBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	feedbackRemove(id) {
+	feedbackRemove(id: string): boolean {
 		const index = this.feedbacks.findIndex((fb) => fb.id === id)
 		if (index !== -1) {
 			const feedback = this.feedbacks[index]
@@ -246,7 +256,7 @@ export default class FragmentFeedbacks extends CoreBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	feedbackReorder(oldIndex, newIndex) {
+	feedbackReorder(oldIndex: number, newIndex: number) {
 		oldIndex = clamp(oldIndex, 0, this.feedbacks.length)
 		newIndex = clamp(newIndex, 0, this.feedbacks.length)
 		this.feedbacks.splice(newIndex, 0, ...this.feedbacks.splice(oldIndex, 1))
@@ -290,7 +300,7 @@ export default class FragmentFeedbacks extends CoreBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	feedbackSetOptions(id, key, value) {
+	feedbackSetOptions(id: string, key: string, value: any) {
 		for (const feedback of this.feedbacks) {
 			if (feedback && feedback.id === id) {
 				if (!feedback.options) feedback.options = {}
@@ -319,7 +329,7 @@ export default class FragmentFeedbacks extends CoreBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	feedbackSetStyleSelection(id, selected) {
+	feedbackSetStyleSelection(id: string, selected: string[]) {
 		if (this.#booleanOnly) throw new Error('FragmentFeedbacks not setup to use styles')
 
 		for (const feedback of this.feedbacks) {
@@ -364,7 +374,7 @@ export default class FragmentFeedbacks extends CoreBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	feedbackSetStyleValue(id, key, value) {
+	feedbackSetStyleValue(id: string, key: string, value: any): boolean {
 		if (this.#booleanOnly) throw new Error('FragmentFeedbacks not setup to use styles')
 
 		if (key === 'png64') {
@@ -397,14 +407,14 @@ export default class FragmentFeedbacks extends CoreBase {
 	 * @param {object} feedback the feedback which changed
 	 * @access private
 	 */
-	#feedbackSubscribe(feedback) {
+	#feedbackSubscribe(feedback: FeedbackInstance): void {
 		if (!feedback.disabled) {
 			if (feedback.instance_id === 'internal') {
 				this.internalModule.feedbackUpdate(feedback, this.controlId)
 			} else {
 				const instance = this.instance.moduleHost.getChild(feedback.instance_id)
 				if (instance) {
-					instance.feedbackUpdate(feedback, this.controlId).catch((e) => {
+					instance.feedbackUpdate(feedback, this.controlId).catch((e: any) => {
 						this.logger.silly(`feedback_update to connection failed: ${e.message} ${e.stack}`)
 					})
 				}
@@ -417,7 +427,7 @@ export default class FragmentFeedbacks extends CoreBase {
 	 * @param {string} instanceId
 	 * @access public
 	 */
-	forgetInstance(instanceId) {
+	forgetInstance(instanceId: string): boolean {
 		let changed = false
 
 		// Cleanup any feedbacks
@@ -529,7 +539,7 @@ export default class FragmentFeedbacks extends CoreBase {
 	 * @param {string} instanceId The instance the feedbacks are for
 	 * @param {object} newValues The new fedeback values
 	 */
-	updateFeedbackValues(instanceId, newValues) {
+	updateFeedbackValues(instanceId: string, newValues: Record<string, CompanionAdvancedFeedbackResult | boolean>) {
 		let changed = false
 
 		for (const feedback of this.feedbacks) {
@@ -558,7 +568,7 @@ export default class FragmentFeedbacks extends CoreBase {
 	 * @param {Set<string>} knownInstanceIds
 	 * @access public
 	 */
-	verifyInstanceIds(knownInstanceIds) {
+	verifyInstanceIds(knownInstanceIds: Set<string>) {
 		let changed = false
 
 		// Clean out feedbacks

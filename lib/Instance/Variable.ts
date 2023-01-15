@@ -20,13 +20,18 @@ import CoreBase from '../Core/Base.js'
 import InstanceCustomVariable from './CustomVariable.js'
 import jsonPatch from 'fast-json-patch'
 import { parse, resolve } from '@estilles/expression-parser'
+import type { Registry, SocketClient } from '../tmp.js'
 
 const logger = LogController.createLogger('Instance/Variable')
 
 const VariableDefinitionsRoom = 'variable-definitions'
 
 // Export for unit tests
-export function parseVariablesInString(string, rawVariableValues, cachedVariableValues) {
+export function parseVariablesInString(
+	string: string,
+	rawVariableValues: Record<string, any>,
+	cachedVariableValues: Record<string, any> | undefined
+) {
 	if (string === undefined || string === null || string === '') {
 		return string
 	}
@@ -75,7 +80,12 @@ export function parseVariablesInString(string, rawVariableValues, cachedVariable
 }
 
 class InstanceVariable extends CoreBase {
-	constructor(registry) {
+	variable_definitions: Record<string, unknown>
+	variable_values: Record<string, Record<string, string | number | boolean | undefined>>
+
+	custom: InstanceCustomVariable
+
+	constructor(registry: Registry) {
 		super(registry, 'variable', 'Instance/Variable')
 
 		this.variable_definitions = {}
@@ -84,11 +94,11 @@ class InstanceVariable extends CoreBase {
 		this.custom = new InstanceCustomVariable(registry, this)
 	}
 
-	getVariableValue(label, name) {
+	getVariableValue(label: string, name: string) {
 		return this.variable_values[label]?.[name]
 	}
 
-	getCustomVariableValue(name) {
+	getCustomVariableValue(name: string) {
 		return this.getVariableValue('internal', `custom_${name}`)
 	}
 
@@ -97,11 +107,11 @@ class InstanceVariable extends CoreBase {
 	 * @param {string} str - String to parse variables in
 	 * @returns str with variables replaced with values
 	 */
-	parseVariables(str) {
-		return parseVariablesInString(str, this.variable_values)
+	parseVariables(str: string) {
+		return parseVariablesInString(str, this.variable_values, undefined)
 	}
 
-	parseNumericExpression(str) {
+	parseNumericExpression(str: string) {
 		const variablePattern = /^\$\(((?:[^:$)]+):(?:[^)$]+))\)/
 
 		const temp = parse(str, variablePattern)
@@ -116,7 +126,7 @@ class InstanceVariable extends CoreBase {
 		return resolve(temp, values)
 	}
 
-	forgetInstance(id, label) {
+	forgetInstance(id: string, label: string) {
 		if (label !== undefined) {
 			if (this.variable_values[label] !== undefined) {
 				const removed_variables = []
@@ -140,7 +150,7 @@ class InstanceVariable extends CoreBase {
 	 * @param {string} label
 	 * @param {object} presets
 	 */
-	instanceLabelRename(labelFrom, labelTo) {
+	instanceLabelRename(labelFrom: string, labelTo: string) {
 		if (this.variable_values[labelTo] === undefined) {
 			this.variable_values[labelTo] = {}
 		}
@@ -150,8 +160,8 @@ class InstanceVariable extends CoreBase {
 
 		// Move variable values, and track the 'diff'
 		if (this.variable_values[labelFrom] !== undefined) {
-			const changed_variables = {}
-			const removed_variables = []
+			const changed_variables: Record<string, any> = {}
+			const removed_variables: string[] = []
 
 			for (let variable in this.variable_values[labelFrom]) {
 				this.variable_values[labelTo][variable] = this.variable_values[labelFrom][variable]
@@ -185,7 +195,7 @@ class InstanceVariable extends CoreBase {
 	 * @param {SocketIO} client - the client socket
 	 * @access public
 	 */
-	clientConnect(client) {
+	clientConnect(client: SocketClient) {
 		this.custom.clientConnect(client)
 
 		client.onPromise('variable-definitions:subscribe', () => {
@@ -198,7 +208,7 @@ class InstanceVariable extends CoreBase {
 			client.leave(VariableDefinitionsRoom)
 		})
 
-		client.onPromise('variables:instance-values', (label) => {
+		client.onPromise('variables:instance-values', (label: string) => {
 			return this.variable_values[label]
 		})
 	}
@@ -209,7 +219,7 @@ class InstanceVariable extends CoreBase {
 	 * @param {string} instance_label
 	 * @param {object} variables
 	 */
-	setVariableDefinitions(instance_label, variables) {
+	setVariableDefinitions(instance_label: string, variables) {
 		const variablesObj = {}
 		for (const variable of variables || []) {
 			// Prune out the name
@@ -229,13 +239,13 @@ class InstanceVariable extends CoreBase {
 		}
 	}
 
-	setVariableValues(label, variables) {
+	setVariableValues(label: string, variables: Record<string, any>) {
 		if (this.variable_values[label] === undefined) {
 			this.variable_values[label] = {}
 		}
 
-		const changed_variables = {}
-		const removed_variables = []
+		const changed_variables: Record<string, any> = {}
+		const removed_variables: string[] = []
 		for (const variable in variables) {
 			const value = variables[variable]
 
@@ -258,7 +268,7 @@ class InstanceVariable extends CoreBase {
 		this.#emitVariablesChanged(changed_variables, removed_variables)
 	}
 
-	#emitVariablesChanged(changed_variables, removed_variables) {
+	#emitVariablesChanged(changed_variables: Record<string, any>, removed_variables: string[]) {
 		if (Object.keys(changed_variables).length > 0 || removed_variables.length > 0) {
 			this.controls.onVariablesChanged(changed_variables, removed_variables)
 			this.internalModule.variablesChanged(changed_variables, removed_variables)
@@ -271,7 +281,7 @@ class InstanceVariable extends CoreBase {
 	 * @param {string} fromlabel
 	 * @param {string} tolabel
 	 */
-	renameVariablesInString(text, fromlabel, tolabel) {
+	renameVariablesInString(text: string, fromlabel: string, tolabel: string): string {
 		let fixtext = text
 
 		if (fixtext && fixtext.includes('$(') && fromlabel && tolabel) {

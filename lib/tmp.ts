@@ -107,6 +107,8 @@ export interface FeedbackInstance {
 	options: Record<string, any>
 
 	style?: unknown
+
+	disabled?: boolean
 }
 
 export interface TriggerEventInstance {
