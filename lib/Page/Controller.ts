@@ -133,10 +133,10 @@ class PageController extends CoreBase {
 	 * Set/update a page
 	 * @param {string} page - the page id
 	 * @param {Object} value - the page object containing the name
-	 * @param {boolean} [clone = false] - <code>true</code> if the graphics should invalidate
+	 * @param {boolean} [redraw = false] - <code>true</code> if the graphics should invalidate
 	 * @access public
 	 */
-	setPage(page: number, value, redraw = true) {
+	setPage(page: number, value: PageInfo, redraw = true) {
 		if (!value) value = { name: 'PAGE' }
 
 		this.logger.silly('Set page ' + page + ' to ', value)

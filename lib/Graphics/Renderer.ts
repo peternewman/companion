@@ -15,8 +15,8 @@
  *
  */
 
-import Image, { HAlignment, VAlignment } from './Image.js'
-import { rgb } from '../Resources/Util.js'
+import Image from './Image.js'
+import { rgb, ParseAlignment } from '../Resources/Util.js'
 import type { ButtonDrawStyle, SomeDrawStyle } from '../tmp.js'
 
 const colorButtonYellow = rgb(255, 198, 0)
@@ -148,8 +148,7 @@ export default class GraphicsRenderer {
 			if (bankStyle.png64 !== undefined && bankStyle.png64 !== null) {
 				try {
 					let data = Buffer.from(bankStyle.png64, 'base64')
-					let halign = bankStyle.pngalignment.split(':', 2)[0] as HAlignment
-					let valign = bankStyle.pngalignment.split(':', 2)[1] as VAlignment
+					const [halign, valign] = ParseAlignment(bankStyle.pngalignment)
 
 					!show_topbar
 						? img.drawFromPNGdata(data, 0, 0, 72, 72, halign, valign)
@@ -197,8 +196,7 @@ export default class GraphicsRenderer {
 				}
 			}
 
-			let halign = bankStyle.alignment.split(':', 2)[0]
-			let valign = bankStyle.alignment.split(':', 2)[1]
+			const [halign, valign] = ParseAlignment(bankStyle.alignment)
 			if (bankStyle.size == 'small') bankStyle.size = 0
 			if (bankStyle.size == 'large') bankStyle.size = 14
 			if (bankStyle.size == 7) bankStyle.size = 0

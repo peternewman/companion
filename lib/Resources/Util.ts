@@ -1,3 +1,4 @@
+import { HAlignment, VAlignment } from '../Graphics/Image.js'
 import Registry from '../Registry.js'
 import { ButtonStyle } from '../tmp.js'
 import { MAX_BUTTONS, MAX_BUTTONS_PER_ROW } from './Constants.js'
@@ -220,14 +221,25 @@ export function rotateBuffer(buffer: Buffer, rotation: -90 | 180 | 90 | 0): Buff
 	return buffer
 }
 
-export async function showFatalError(_title: string, message: string) {
-	// TODO - reimplement this
-	// if (global.electron && global.electron.dialog) {
-	// 	global.electron.dialog.showErrorBox(title, message)
-	// } else {
+export async function showFatalError(title: string, message: string) {
+	sendOverIpc({
+		messageType: 'fatal-error',
+		title,
+		body: message,
+	})
+
 	console.error(message)
-	// }
 	process.exit(1)
+}
+
+export async function showErrorMessage(title: string, message: string) {
+	sendOverIpc({
+		messageType: 'show-error',
+		title,
+		body: message,
+	})
+
+	console.error(message)
 }
 
 export function sendOverIpc(data: any) {
@@ -264,4 +276,39 @@ export function GetButtonBitmapSize(registry: Registry, style: ButtonStyle) {
 			height: 58,
 		}
 	}
+}
+
+export function SplitVariableId(variableId: string) {
+	const splitIndex = variableId.indexOf(':')
+	if (splitIndex === -1) throw new Error(`"${variableId}" is not a valid variable id`)
+
+	const label = variableId.substring(0, splitIndex)
+	const variable = variableId.substring(splitIndex + 1)
+
+	return [label, variable]
+}
+
+export function ParseAlignment(alignment: string, validate = false): [HAlignment, VAlignment, string] {
+	let [halign0, valign0] = alignment.toLowerCase().split(':', 2)
+
+	let halign: HAlignment
+	let valign: VAlignment
+
+	if (halign0 !== 'left' && halign0 !== 'right' && halign0 !== 'center') {
+		if (validate) throw new Error(`Invalid horizontal component: "${halign0}"`)
+
+		halign = 'center'
+	} else {
+		halign = halign0
+	}
+
+	if (valign0 !== 'top' && valign0 !== 'bottom' && valign0 !== 'center') {
+		if (validate) throw new Error(`Invalid vertical component: "${valign0}"`)
+
+		valign = 'center'
+	} else {
+		valign = valign0
+	}
+
+	return [halign, valign, `${halign}:${valign}`]
 }

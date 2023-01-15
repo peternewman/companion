@@ -112,7 +112,7 @@ export default class FragmentFeedbacks extends CoreBase {
 	 */
 	#cleanupFeedback(feedback: FeedbackInstance) {
 		// Inform relevant module
-		const instance = this.instance.moduleHost.getChild(feedback.instance_id)
+		const instance = this.instance.moduleHost.getChild(feedback.instance_id, true)
 		if (instance) {
 			instance.feedbackDelete(feedback).catch((e: any) => {
 				this.logger.silly(`feedback_delete to connection failed: ${e.message}`)
@@ -354,6 +354,15 @@ export default class FragmentFeedbacks extends CoreBase {
 							newStyle[key] = null
 						}
 					}
+
+					if (key === 'text') {
+						// also preserve textExpression
+						newStyle['textExpression'] =
+							oldStyle['textExpression'] ??
+							(defaultStyle['textExpression'] !== undefined
+								? defaultStyle['textExpression']
+								: this.baseStyle['textExpression'])
+					}
 				}
 				feedback.style = newStyle
 
@@ -412,7 +421,7 @@ export default class FragmentFeedbacks extends CoreBase {
 			if (feedback.instance_id === 'internal') {
 				this.internalModule.feedbackUpdate(feedback, this.controlId)
 			} else {
-				const instance = this.instance.moduleHost.getChild(feedback.instance_id)
+				const instance = this.instance.moduleHost.getChild(feedback.instance_id, true)
 				if (instance) {
 					instance.feedbackUpdate(feedback, this.controlId).catch((e: any) => {
 						this.logger.silly(`feedback_update to connection failed: ${e.message} ${e.stack}`)
@@ -474,6 +483,12 @@ export default class FragmentFeedbacks extends CoreBase {
 					delete prunedValue.imageBuffer
 					delete prunedValue.imageBufferPosition
 
+					// Ensure `textExpression` is set at the same times as `text`
+					delete prunedValue.textExpression
+					if ('text' in prunedValue) {
+						prunedValue.textExpression = rawValue.textExpression || false
+					}
+
 					style = {
 						...style,
 						...prunedValue,
@@ -511,7 +526,7 @@ export default class FragmentFeedbacks extends CoreBase {
 					this.internalModule.feedbackUpdate(feedback, this.controlId)
 				})
 			} else {
-				const instance = this.instance.moduleHost.getChild(feedback.instance_id)
+				const instance = this.instance.moduleHost.getChild(feedback.instance_id, true)
 				if (instance) {
 					ps.push(instance.feedbackUpdate(feedback, this.controlId))
 				}

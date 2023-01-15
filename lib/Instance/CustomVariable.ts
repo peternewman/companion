@@ -287,7 +287,8 @@ export default class InstanceCustomVariable extends CoreBase {
 	setValueToExpression(name: string, expression: string) {
 		if (this.custom_variables[name]) {
 			try {
-				this.#setValueInner(name, this.base.parseNumericExpression(expression))
+				const result = this.base.parseExpression(expression)
+				this.#setValueInner(name, result.value)
 				return true
 			} catch (error: any) {
 				this.logger.warn(`${error.toString()}, in expression: "${expression}"`)

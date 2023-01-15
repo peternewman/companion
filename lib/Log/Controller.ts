@@ -9,6 +9,7 @@ import Transport from 'winston-transport'
 import supportsColor from 'supports-color'
 import consoleColors from './Colors.js'
 import { init, configureScope, addBreadcrumb } from '@sentry/node'
+import { RewriteFrames as RewriteFramesIntegration } from '@sentry/integrations'
 import '@sentry/tracing'
 import debounceFn from 'debounce-fn'
 import type { Registry, SocketClient, SocketServerExt } from '../tmp'
@@ -270,10 +271,11 @@ class LogController {
 					release: `companion@${registry.appBuild || registry.appVersion}`,
 					beforeSend(event) {
 						if (event.exception) {
-							console.log('sentry', 'error', event.exception)
+							console.log('sentry', 'error', JSON.stringify(event.exception, undefined, 4))
 						}
 						return event
 					},
+					integrations: [new RewriteFramesIntegration()],
 				})
 
 				configureScope((scope) => {

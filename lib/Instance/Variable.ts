@@ -19,8 +19,10 @@ import LogController from '../Log/Controller.js'
 import CoreBase from '../Core/Base.js'
 import InstanceCustomVariable from './CustomVariable.js'
 import jsonPatch from 'fast-json-patch'
-import { parse, resolve } from '@estilles/expression-parser'
 import type { Registry, SocketClient } from '../tmp.js'
+import { ResolveExpression } from '../Shared/Expression/ExpressionResolve.js'
+import { ParseExpression } from '../Shared/Expression/ExpressionParse.js'
+import { ExpressionFunctions } from '../Shared/Expression/ExpressionFunctions.js'
 
 const logger = LogController.createLogger('Instance/Variable')
 
@@ -31,12 +33,20 @@ export function parseVariablesInString(
 	string: string,
 	rawVariableValues: Record<string, any>,
 	cachedVariableValues: Record<string, any> | undefined
-) {
+): {
+	text: string
+	variableIds: string[]
+} {
 	if (string === undefined || string === null || string === '') {
-		return string
+		return {
+			text: string,
+			variableIds: [],
+		}
 	}
 	if (typeof string !== 'string') string = `${string}`
 	if (!cachedVariableValues) cachedVariableValues = {}
+
+	const referencedVariableIds = []
 
 	// Everybody stand back. I know regular expressions. - xckd #208 /ck/kc/
 	const reg = /\$\(([^:$)]+):([^)$]+)\)/
@@ -53,6 +63,7 @@ export function parseVariablesInString(
 		const fullId = matches[0]
 		const instanceId = matches[1]
 		const variableId = matches[2]
+		referencedVariableIds.push(`${instanceId}:${variableId}`)
 
 		let cachedValue = cachedVariableValues[fullId]
 		if (cachedVariableValues[fullId] === undefined) {
@@ -63,7 +74,9 @@ export function parseVariablesInString(
 			if (rawVariableValues[instanceId] && rawVariableValues[instanceId][variableId] !== undefined) {
 				const rawValue = rawVariableValues[instanceId][variableId]
 
-				cachedValue = parseVariablesInString(rawValue, rawVariableValues, cachedVariableValues)
+				const result = parseVariablesInString(rawValue, rawVariableValues, cachedVariableValues)
+				cachedValue = result.text
+				referencedVariableIds.push(...result.variableIds)
 				if (cachedValue === undefined) cachedValue = ''
 			} else {
 				// Variable has no value
@@ -76,7 +89,10 @@ export function parseVariablesInString(
 		string = string.replace(fullId, cachedValue)
 	}
 
-	return string
+	return {
+		text: string,
+		variableIds: referencedVariableIds,
+	}
 }
 
 class InstanceVariable extends CoreBase {
@@ -111,19 +127,35 @@ class InstanceVariable extends CoreBase {
 		return parseVariablesInString(str, this.variable_values, undefined)
 	}
 
-	parseNumericExpression(str: string) {
-		const variablePattern = /^\$\(((?:[^:$)]+):(?:[^)$]+))\)/
+	/**
+	 * Parse and execute an expression in a string
+	 * @param {string} str - String containing the expression to parse
+	 * @param {string | undefined} requiredType - Fail if the result is not of specified type
+	 * @returns boolean/number/string result of the expression
+	 */
+	parseExpression(str: string, requiredType: 'boolean' | 'number' | 'string' | undefined) {
+		const referencedVariableIds = new Set()
 
-		const temp = parse(str, variablePattern)
-		const values = temp
-			.filter((token) => token.name)
-			.reduce((previous, { name }) => {
-				const [label, variable] = name.split(':')
-				const value = this.getVariableValue(label, variable)
-				return { ...previous, [name]: value }
-			}, {})
+		const getVariableValue = (variableId: string) => {
+			const result = this.parseVariables(`$(${variableId})`)
 
-		return resolve(temp, values)
+			for (const id of result.variableIds) {
+				referencedVariableIds.add(id)
+			}
+
+			return result.text
+		}
+
+		const value = ResolveExpression(ParseExpression(str), getVariableValue, ExpressionFunctions)
+
+		if (requiredType && typeof value !== requiredType) {
+			throw new Error('Unexpected return type')
+		}
+
+		return {
+			value,
+			variableIds: referencedVariableIds,
+		}
 	}
 
 	forgetInstance(id: string, label: string) {
@@ -272,6 +304,7 @@ class InstanceVariable extends CoreBase {
 		if (Object.keys(changed_variables).length > 0 || removed_variables.length > 0) {
 			this.controls.onVariablesChanged(changed_variables, removed_variables)
 			this.internalModule.variablesChanged(changed_variables, removed_variables)
+			this.instance.moduleHost.onVariablesChanged(changed_variables, removed_variables)
 		}
 	}
 
