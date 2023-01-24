@@ -5,6 +5,7 @@ import { clamp } from '../../../Resources/Util.js'
 import { GetStepIds } from '../../../Shared/Controls.js'
 import type { ActionInstance, ButtonDrawStyleBase, Complete, FeedbackInstance, Registry } from '../../../tmp.js'
 import { ActionInstanceBase } from '@companion-module/base/dist/host-api/api.js'
+import { ControlBaseWithDynamicActionSets, ControlBaseWithActions, ControlBaseWithSteps } from '../../ControlBase.js'
 
 export interface ButtonConfig {
 	type: 'button'
@@ -59,12 +60,10 @@ interface StepOptions {
  * develop commercial activities involving the Companion software without
  * disclosing the source code of your own applications.
  */
-export default class ControlButtonNormal extends ButtonControlBase<
-	ButtonConfig,
-	ButtonRuntimeConfig,
-	ButtonOptions,
-	StepOptions
-> {
+export default class ControlButtonNormal
+	extends ButtonControlBase<ButtonConfig, ButtonRuntimeConfig, ButtonOptions, StepOptions>
+	implements ControlBaseWithActions, ControlBaseWithDynamicActionSets, ControlBaseWithSteps
+{
 	readonly type = 'button'
 	/**
 	 * The defaults options for a button
@@ -151,7 +150,7 @@ export default class ControlButtonNormal extends ButtonControlBase<
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionAdd(stepId: string, setId: string, actionItem: ActionInstance) {
+	actionAdd(stepId: string, setId: string, actionItem: ActionInstance): boolean {
 		const step = this.steps[stepId]
 		if (step) {
 			return step.actionAdd(setId, actionItem)
@@ -691,7 +690,7 @@ export default class ControlButtonNormal extends ButtonControlBase<
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	stepAdd() {
+	stepAdd(): string {
 		const existingKeys = GetStepIds(this.steps)
 			.map((k) => Number(k))
 			.filter((k) => !isNaN(k))

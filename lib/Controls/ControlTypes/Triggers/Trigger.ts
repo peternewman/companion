@@ -1,4 +1,8 @@
-import ControlBase from '../../ControlBase.js'
+import ControlBase, {
+	ControlBaseWithActions,
+	ControlBaseWithEvents,
+	ControlBaseWithFeedbacks,
+} from '../../ControlBase.js'
 import FragmentActions from '../../Fragments/FragmentActions.js'
 import FragmentFeedbacks from '../../Fragments/FragmentFeedbacks.js'
 import { TriggersListRoom } from '../../Controller.js'
@@ -55,7 +59,10 @@ export interface TriggerOptions {
  * develop commercial activities involving the Companion software without
  * disclosing the source code of your own applications.
  */
-export default class ControlTrigger extends ControlBase<TriggerConfig> {
+export default class ControlTrigger
+	extends ControlBase<TriggerConfig>
+	implements ControlBaseWithActions, ControlBaseWithFeedbacks<Record<string, never>>, ControlBaseWithEvents
+{
 	readonly type = 'trigger'
 
 	/**
@@ -151,7 +158,7 @@ export default class ControlTrigger extends ControlBase<TriggerConfig> {
 		registry: Registry,
 		eventBus: TriggerEvents,
 		controlId: string,
-		storage: TriggerConfig,
+		storage: TriggerConfig | null,
 		isImport: boolean
 	) {
 		super(registry, controlId, 'trigger', 'Controls/ControlTypes/Triggers')
@@ -234,7 +241,7 @@ export default class ControlTrigger extends ControlBase<TriggerConfig> {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	async actionLearn(_stepId: string, _setId: string, id: string) {
+	async actionLearn(_stepId: string, _setId: string, id: string): Promise<boolean> {
 		return this.actions.actionLearn('0', id)
 	}
 
@@ -246,7 +253,7 @@ export default class ControlTrigger extends ControlBase<TriggerConfig> {
 	 * @param {boolean} enabled
 	 * @access public
 	 */
-	actionEnabled(_stepId: string, _setId: string, id: string, enabled: boolean) {
+	actionEnabled(_stepId: string, _setId: string, id: string, enabled: boolean): boolean {
 		return this.actions.actionEnabled('0', id, enabled)
 	}
 

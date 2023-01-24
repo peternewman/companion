@@ -1,19 +1,39 @@
 import { cloneDeep } from 'lodash-es'
-import Registry from '../Registry.js'
 import CoreBase from '../Core/Base.js'
 import ControlButtonNormal from './ControlTypes/Button/Normal.js'
 import ControlButtonPageDown from './ControlTypes/PageDown.js'
 import ControlButtonPageNumber from './ControlTypes/PageNumber.js'
 import ControlButtonPageUp from './ControlTypes/PageUp.js'
 import { CreateBankControlId, CreateTriggerControlId, ParseControlId } from '../Shared/ControlId.js'
-import { ControlConfigRoom } from './ControlBase.js'
+import ControlBase, {
+	ControlBaseWithActions,
+	ControlBaseWithDynamicActionSets,
+	ControlBaseWithEvents,
+	ControlBaseWithFeedbacks,
+	ControlBaseWithSteps,
+	ControlConfigRoom,
+} from './ControlBase.js'
 import ActionRunner from './ActionRunner.js'
 import ActionRecorder from './ActionRecorder.js'
-import ControlTrigger from './ControlTypes/Triggers/Trigger.js'
+import ControlTrigger, { TriggerInfo } from './ControlTypes/Triggers/Trigger.js'
 import { nanoid } from 'nanoid'
 import TriggerEvents from './TriggerEvents.js'
+import type { Registry, SocketClient } from '../tmp.js'
+import { MAX_BUTTONS } from '../Resources/Constants.js'
 
 export const TriggersListRoom = 'triggers:list'
+
+type SomeControl = ControlBase<any, any> &
+	Partial<ControlBaseWithActions> &
+	Partial<ControlBaseWithDynamicActionSets> &
+	Partial<ControlBaseWithSteps> &
+	Partial<ControlBaseWithFeedbacks<unknown>> &
+	Partial<ControlBaseWithEvents>
+// | ControlButtonNormal
+// | ControlButtonPageDown
+// | ControlButtonPageNumber
+// | ControlButtonPageUp
+// | ControlTrigger
 
 /**
  * The class that manages the controls
@@ -55,24 +75,24 @@ class ControlsController extends CoreBase {
 	 * The currently configured controls
 	 * @access private
 	 */
-	#controls = {}
+	#controls: Record<string, SomeControl | undefined> = {}
 
 	/**
 	 * Triggers events
 	 * @type {TriggerEvents}
 	 * @access public
 	 */
-	triggers
+	triggers: TriggerEvents
 
 	/**
 	 * @param {Registry} registry - the application core
 	 */
-	constructor(registry) {
+	constructor(registry: Registry) {
 		super(registry, 'controls', 'Controls/Controller')
 
 		this.actions = new ActionRunner(registry)
 		this.actionRecorder = new ActionRecorder(registry)
-		this.triggers = new TriggerEvents(registry)
+		this.triggers = new TriggerEvents()
 
 		// Init all the control classes
 		const config = this.db.getKey('controls', {})
@@ -88,9 +108,9 @@ class ControlsController extends CoreBase {
 	 * Check the instance-status of every control
 	 * @access public
 	 */
-	checkAllStatus() {
+	checkAllStatus(): void {
 		for (const control of Object.values(this.#controls)) {
-			if (typeof control.checkButtonStatus === 'function') {
+			if (typeof control?.checkButtonStatus === 'function') {
 				control.checkButtonStatus()
 			}
 		}
@@ -101,12 +121,12 @@ class ControlsController extends CoreBase {
 	 * @param {SocketIO} client - the client socket
 	 * @access public
 	 */
-	clientConnect(client) {
+	clientConnect(client: SocketClient) {
 		this.actionRecorder.clientConnect(client)
 
 		this.triggers.emit('client_connect')
 
-		client.onPromise('controls:subscribe', (controlId) => {
+		client.onPromise('controls:subscribe', (controlId: string) => {
 			client.join(ControlConfigRoom(controlId))
 
 			setImmediate(() => {
@@ -125,14 +145,14 @@ class ControlsController extends CoreBase {
 			}
 		})
 
-		client.onPromise('controls:unsubscribe', (controlId) => {
+		client.onPromise('controls:unsubscribe', (controlId: string) => {
 			client.leave(ControlConfigRoom(controlId))
 		})
 
-		client.onPromise('controls:reset', (controlId, type) => {
+		client.onPromise('controls:reset', (controlId: string, type: string) => {
 			return this.resetControl(controlId, type)
 		})
-		client.onPromise('controls:copy', (fromControlId, toControlId) => {
+		client.onPromise('controls:copy', (fromControlId: string, toControlId: string) => {
 			if (!this.#validateBankControlId(toControlId)) {
 				// Control id is not valid!
 				return false
@@ -153,7 +173,7 @@ class ControlsController extends CoreBase {
 
 			return false
 		})
-		client.onPromise('controls:move', (fromControlId, toControlId) => {
+		client.onPromise('controls:move', (fromControlId: string, toControlId: string) => {
 			if (!this.#validateBankControlId(toControlId)) {
 				// Control id is not valid!
 				return false
@@ -175,7 +195,7 @@ class ControlsController extends CoreBase {
 
 			return false
 		})
-		client.onPromise('controls:swap', (controlIdA, controlIdB) => {
+		client.onPromise('controls:swap', (controlIdA: string, controlIdB: string) => {
 			if (!this.#validateBankControlId(controlIdA) || !this.#validateBankControlId(controlIdB)) {
 				// Control id is not valid!
 				return false
@@ -207,7 +227,7 @@ class ControlsController extends CoreBase {
 			return true
 		})
 
-		client.onPromise('controls:set-style-fields', (controlId, diff) => {
+		client.onPromise('controls:set-style-fields', (controlId: string, diff) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -218,7 +238,7 @@ class ControlsController extends CoreBase {
 			}
 		})
 
-		client.onPromise('controls:set-options-field', (controlId, key, value) => {
+		client.onPromise('controls:set-options-field', (controlId: string, key: string, value: any) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -229,7 +249,7 @@ class ControlsController extends CoreBase {
 			}
 		})
 
-		client.onPromise('controls:feedback:add', (controlId, instanceId, feedbackId) => {
+		client.onPromise('controls:feedback:add', (controlId: string, instanceId: string, feedbackId: string) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -249,7 +269,7 @@ class ControlsController extends CoreBase {
 			}
 		})
 
-		client.onPromise('controls:feedback:learn', (controlId, id) => {
+		client.onPromise('controls:feedback:learn', (controlId: string, id: string) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -260,7 +280,7 @@ class ControlsController extends CoreBase {
 			}
 		})
 
-		client.onPromise('controls:feedback:enabled', (controlId, id, enabled) => {
+		client.onPromise('controls:feedback:enabled', (controlId: string, id: string, enabled: boolean) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -271,7 +291,7 @@ class ControlsController extends CoreBase {
 			}
 		})
 
-		client.onPromise('controls:feedback:remove', (controlId, id) => {
+		client.onPromise('controls:feedback:remove', (controlId: string, id: string) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -282,7 +302,7 @@ class ControlsController extends CoreBase {
 			}
 		})
 
-		client.onPromise('controls:feedback:duplicate', (controlId, id) => {
+		client.onPromise('controls:feedback:duplicate', (controlId: string, id: string) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -293,7 +313,7 @@ class ControlsController extends CoreBase {
 			}
 		})
 
-		client.onPromise('controls:feedback:set-option', (controlId, id, key, value) => {
+		client.onPromise('controls:feedback:set-option', (controlId: string, id: string, key: string, value: any) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -304,7 +324,7 @@ class ControlsController extends CoreBase {
 			}
 		})
 
-		client.onPromise('controls:feedback:reorder', (controlId, oldIndex, newIndex) => {
+		client.onPromise('controls:feedback:reorder', (controlId: string, oldIndex: number, newIndex: number) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -314,7 +334,7 @@ class ControlsController extends CoreBase {
 				throw new Error(`Control "${controlId}" does not support feedbacks`)
 			}
 		})
-		client.onPromise('controls:feedback:set-style-selection', (controlId, id, selected) => {
+		client.onPromise('controls:feedback:set-style-selection', (controlId: string, id: string, selected: string[]) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -324,7 +344,7 @@ class ControlsController extends CoreBase {
 				throw new Error(`Control "${controlId}" does not support feedbacks`)
 			}
 		})
-		client.onPromise('controls:feedback:set-style-value', (controlId, id, key, value) => {
+		client.onPromise('controls:feedback:set-style-value', (controlId: string, id: string, key: string, value: any) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -335,35 +355,38 @@ class ControlsController extends CoreBase {
 			}
 		})
 
-		client.onPromise('controls:hot-press', (controlId, direction, deviceId) => {
+		client.onPromise('controls:hot-press', (controlId: string, direction: boolean, deviceId?: string) => {
 			this.logger.silly(`being told from gui to hot press ${controlId} ${direction} ${deviceId}`)
 
 			this.pressControl(controlId, direction, deviceId ? `hot:${deviceId}` : undefined)
 		})
 
-		client.onPromise('controls:hot-rotate', (controlId, direction, deviceId) => {
+		client.onPromise('controls:hot-rotate', (controlId: string, direction: boolean, deviceId?: string) => {
 			this.logger.silly(`being told from gui to hot rotate ${controlId} ${direction} ${deviceId}`)
 
 			this.rotateControl(controlId, direction, deviceId ? `hot:${deviceId}` : undefined)
 		})
 
-		client.onPromise('controls:action:add', (controlId, stepId, setId, instanceId, actionId) => {
-			const control = this.getControl(controlId)
-			if (!control) return false
+		client.onPromise(
+			'controls:action:add',
+			(controlId: string, stepId: string, setId: string, instanceId: string, actionId: string) => {
+				const control = this.getControl(controlId)
+				if (!control) return false
 
-			if (typeof control.actionAdd === 'function') {
-				const actionItem = this.instance.definitions.createActionItem(instanceId, actionId)
-				if (actionItem) {
-					return control.actionAdd(stepId, setId, actionItem)
+				if (typeof control.actionAdd === 'function') {
+					const actionItem = this.instance.definitions.createActionItem(instanceId, actionId)
+					if (actionItem) {
+						return control.actionAdd(stepId, setId, actionItem)
+					} else {
+						return false
+					}
 				} else {
-					return false
+					throw new Error(`Control "${controlId}" does not support actions`)
 				}
-			} else {
-				throw new Error(`Control "${controlId}" does not support actions`)
 			}
-		})
+		)
 
-		client.onPromise('controls:action:learn', (controlId, stepId, setId, id) => {
+		client.onPromise('controls:action:learn', (controlId: string, stepId: string, setId: string, id: string) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -374,18 +397,21 @@ class ControlsController extends CoreBase {
 			}
 		})
 
-		client.onPromise('controls:action:enabled', (controlId, stepId, setId, id, enabled) => {
-			const control = this.getControl(controlId)
-			if (!control) return false
+		client.onPromise(
+			'controls:action:enabled',
+			(controlId: string, stepId: string, setId: string, id: string, enabled: boolean) => {
+				const control = this.getControl(controlId)
+				if (!control) return false
 
-			if (typeof control.actionEnabled === 'function') {
-				return control.actionEnabled(stepId, setId, id, enabled)
-			} else {
-				throw new Error(`Control "${controlId}" does not support actions`)
+				if (typeof control.actionEnabled === 'function') {
+					return control.actionEnabled(stepId, setId, id, enabled)
+				} else {
+					throw new Error(`Control "${controlId}" does not support actions`)
+				}
 			}
-		})
+		)
 
-		client.onPromise('controls:action:remove', (controlId, stepId, setId, id) => {
+		client.onPromise('controls:action:remove', (controlId: string, stepId: string, setId: string, id: string) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -396,7 +422,7 @@ class ControlsController extends CoreBase {
 			}
 		})
 
-		client.onPromise('controls:action:duplicate', (controlId, stepId, setId, id) => {
+		client.onPromise('controls:action:duplicate', (controlId: string, stepId: string, setId: string, id: string) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -407,30 +433,44 @@ class ControlsController extends CoreBase {
 			}
 		})
 
-		client.onPromise('controls:action:set-delay', (controlId, stepId, setId, id, delay) => {
-			const control = this.getControl(controlId)
-			if (!control) return false
+		client.onPromise(
+			'controls:action:set-delay',
+			(controlId: string, stepId: string, setId: string, id: string, delay: number) => {
+				const control = this.getControl(controlId)
+				if (!control) return false
 
-			if (typeof control.actionSetDelay === 'function') {
-				return control.actionSetDelay(stepId, setId, id, delay)
-			} else {
-				throw new Error(`Control "${controlId}" does not support actions`)
+				if (typeof control.actionSetDelay === 'function') {
+					return control.actionSetDelay(stepId, setId, id, delay)
+				} else {
+					throw new Error(`Control "${controlId}" does not support actions`)
+				}
 			}
-		})
+		)
 
-		client.onPromise('controls:action:set-option', (controlId, stepId, setId, id, key, value) => {
-			const control = this.getControl(controlId)
-			if (!control) return false
+		client.onPromise(
+			'controls:action:set-option',
+			(controlId: string, stepId: string, setId: string, id: string, key: string, value: any) => {
+				const control = this.getControl(controlId)
+				if (!control) return false
 
-			if (typeof control.actionSetOption === 'function') {
-				return control.actionSetOption(stepId, setId, id, key, value)
-			} else {
-				throw new Error(`Control "${controlId}" does not support actions`)
+				if (typeof control.actionSetOption === 'function') {
+					return control.actionSetOption(stepId, setId, id, key, value)
+				} else {
+					throw new Error(`Control "${controlId}" does not support actions`)
+				}
 			}
-		})
+		)
 		client.onPromise(
 			'controls:action:reorder',
-			(controlId, dragStepId, dragSetId, dragIndex, dropStepId, dropSetId, dropIndex) => {
+			(
+				controlId: string,
+				dragStepId: string,
+				dragSetId: string,
+				dragIndex: number,
+				dropStepId: string,
+				dropSetId: string,
+				dropIndex: number
+			) => {
 				const control = this.getControl(controlId)
 				if (!control) return false
 
@@ -441,7 +481,7 @@ class ControlsController extends CoreBase {
 				}
 			}
 		)
-		client.onPromise('controls:action-set:add', (controlId, stepId) => {
+		client.onPromise('controls:action-set:add', (controlId: string, stepId: string) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -451,7 +491,7 @@ class ControlsController extends CoreBase {
 				throw new Error(`Control "${controlId}" does not support this operation`)
 			}
 		})
-		client.onPromise('controls:action-set:remove', (controlId, stepId, setId) => {
+		client.onPromise('controls:action-set:remove', (controlId: string, stepId: string, setId: string) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -462,29 +502,35 @@ class ControlsController extends CoreBase {
 			}
 		})
 
-		client.onPromise('controls:action-set:rename', (controlId, stepId, oldSetId, newSetId) => {
-			const control = this.getControl(controlId)
-			if (!control) return false
+		client.onPromise(
+			'controls:action-set:rename',
+			(controlId: string, stepId: string, oldSetId: string, newSetId: string) => {
+				const control = this.getControl(controlId)
+				if (!control) return false
 
-			if (typeof control.actionSetRename === 'function') {
-				return control.actionSetRename(stepId, oldSetId, newSetId)
-			} else {
-				throw new Error(`Control "${controlId}" does not support this operation`)
+				if (typeof control.actionSetRename === 'function') {
+					return control.actionSetRename(stepId, oldSetId, newSetId)
+				} else {
+					throw new Error(`Control "${controlId}" does not support this operation`)
+				}
 			}
-		})
+		)
 
-		client.onPromise('controls:action-set:set-run-while-held', (controlId, stepId, setId, runWhileHeld) => {
-			const control = this.getControl(controlId)
-			if (!control) return false
+		client.onPromise(
+			'controls:action-set:set-run-while-held',
+			(controlId: string, stepId: string, setId: string, runWhileHeld: boolean) => {
+				const control = this.getControl(controlId)
+				if (!control) return false
 
-			if (typeof control.actionSetRunWhileHeld === 'function') {
-				return control.actionSetRunWhileHeld(stepId, setId, runWhileHeld)
-			} else {
-				throw new Error(`Control "${controlId}" does not support this operation`)
+				if (typeof control.actionSetRunWhileHeld === 'function') {
+					return control.actionSetRunWhileHeld(stepId, setId, runWhileHeld)
+				} else {
+					throw new Error(`Control "${controlId}" does not support this operation`)
+				}
 			}
-		})
+		)
 
-		client.onPromise('controls:step:add', (controlId) => {
+		client.onPromise('controls:step:add', (controlId: string) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -494,7 +540,7 @@ class ControlsController extends CoreBase {
 				throw new Error(`Control "${controlId}" does not support steps`)
 			}
 		})
-		client.onPromise('controls:step:remove', (controlId, stepId) => {
+		client.onPromise('controls:step:remove', (controlId: string, stepId: string) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -505,7 +551,7 @@ class ControlsController extends CoreBase {
 			}
 		})
 
-		client.onPromise('controls:step:swap', (controlId, stepId1, stepId2) => {
+		client.onPromise('controls:step:swap', (controlId: string, stepId1: string, stepId2: string) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -516,7 +562,7 @@ class ControlsController extends CoreBase {
 			}
 		})
 
-		client.onPromise('controls:step:set-next', (controlId, stepId) => {
+		client.onPromise('controls:step:set-next', (controlId: string, stepId: string) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -530,11 +576,14 @@ class ControlsController extends CoreBase {
 		client.onPromise('triggers:subscribe', () => {
 			client.join(TriggersListRoom)
 
-			const triggers = {}
+			const triggers: Record<string, TriggerInfo> = {}
 
 			for (const [controlId, control] of Object.entries(this.#controls)) {
-				if (typeof control.toTriggerJSON === 'function') {
-					triggers[controlId] = control.toTriggerJSON(false)
+				if (control?.type === 'trigger') {
+					const trigger = control as ControlTrigger
+					if (typeof trigger.toTriggerJSON === 'function') {
+						triggers[controlId] = trigger.toTriggerJSON()
+					}
 				}
 			}
 
@@ -550,7 +599,9 @@ class ControlsController extends CoreBase {
 			this.#controls[controlId] = newControl
 
 			// Add trigger to the end of the list
-			const allTriggers = Object.values(this.getAllControls()).filter((control) => control.type === 'trigger')
+			const allTriggers = Object.values(this.getAllControls()).filter(
+				(control): control is ControlTrigger => control?.type === 'trigger'
+			)
 			const maxRank = Math.max(0, ...allTriggers.map((control) => control.options.sortOrder))
 			newControl.optionsSetField('sortOrder', maxRank, true)
 
@@ -559,7 +610,7 @@ class ControlsController extends CoreBase {
 
 			return controlId
 		})
-		client.onPromise('triggers:delete', (controlId) => {
+		client.onPromise('triggers:delete', (controlId: string) => {
 			if (!this.#validateTriggerControlId(controlId)) {
 				// Control id is not valid!
 				return false
@@ -578,7 +629,7 @@ class ControlsController extends CoreBase {
 
 			return false
 		})
-		client.onPromise('triggers:clone', (controlId) => {
+		client.onPromise('triggers:clone', (controlId: string) => {
 			if (!this.#validateTriggerControlId(controlId)) {
 				// Control id is not valid!
 				return false
@@ -600,7 +651,7 @@ class ControlsController extends CoreBase {
 
 			return false
 		})
-		client.onPromise('triggers:test', (controlId) => {
+		client.onPromise('triggers:test', (controlId: string) => {
 			if (!this.#validateTriggerControlId(controlId)) {
 				// Control id is not valid!
 				return false
@@ -613,7 +664,7 @@ class ControlsController extends CoreBase {
 
 			return false
 		})
-		client.onPromise('triggers:set-order', (triggerIds) => {
+		client.onPromise('triggers:set-order', (triggerIds: string[]) => {
 			if (!Array.isArray(triggerIds)) throw new Error('Expected array of ids')
 
 			triggerIds = triggerIds.filter((id) => this.#validateTriggerControlId(id))
@@ -628,12 +679,14 @@ class ControlsController extends CoreBase {
 
 			// Fill in for any which weren't specified
 			const updatedTriggerIds = new Set(triggerIds)
-			const triggerControls = Object.values(this.getAllControls()).filter((c) => c.type === 'trigger')
+			const triggerControls = Object.values(this.getAllControls()).filter(
+				(c): c is ControlTrigger => c?.type === 'trigger'
+			)
 			triggerControls.sort((a, b) => a.options.sortOrder - b.options.sortOrder)
 
 			let nextIndex = triggerIds.length
 			for (const control of triggerControls) {
-				if (!updatedTriggerIds.has(control.controlId) && typeof control.optionsSetField === 'function') {
+				if (control && !updatedTriggerIds.has(control.controlId) && typeof control.optionsSetField === 'function') {
 					control.optionsSetField('sortOrder', nextIndex++, true)
 				}
 			}
@@ -641,7 +694,7 @@ class ControlsController extends CoreBase {
 			return true
 		})
 
-		client.onPromise('controls:event:add', (controlId, eventType) => {
+		client.onPromise('controls:event:add', (controlId: string, eventType: string) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -657,7 +710,7 @@ class ControlsController extends CoreBase {
 			}
 		})
 
-		client.onPromise('controls:event:enabled', (controlId, id, enabled) => {
+		client.onPromise('controls:event:enabled', (controlId: string, id: string, enabled: boolean) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -668,7 +721,7 @@ class ControlsController extends CoreBase {
 			}
 		})
 
-		client.onPromise('controls:event:remove', (controlId, id) => {
+		client.onPromise('controls:event:remove', (controlId: string, id: string) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -679,7 +732,7 @@ class ControlsController extends CoreBase {
 			}
 		})
 
-		client.onPromise('controls:event:duplicate', (controlId, id) => {
+		client.onPromise('controls:event:duplicate', (controlId: string, id: string) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -690,7 +743,7 @@ class ControlsController extends CoreBase {
 			}
 		})
 
-		client.onPromise('controls:event:set-option', (controlId, id, key, value) => {
+		client.onPromise('controls:event:set-option', (controlId: string, id: string, key: string, value: any) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -701,7 +754,7 @@ class ControlsController extends CoreBase {
 			}
 		})
 
-		client.onPromise('controls:event:reorder', (controlId, oldIndex, newIndex) => {
+		client.onPromise('controls:event:reorder', (controlId: string, oldIndex: number, newIndex: number) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -723,7 +776,13 @@ class ControlsController extends CoreBase {
 	 * @returns
 	 * @access private
 	 */
-	#createClassForControl(controlId, category, controlType, controlObj, isImport) {
+	#createClassForControl(
+		controlId: string,
+		category: 'all' | 'bank' | 'trigger',
+		controlType: string,
+		controlObj,
+		isImport: boolean
+	): ControlBase<any, any> | null {
 		if (category === 'all' || category === 'bank') {
 			switch (controlType) {
 				case 'button':
@@ -771,10 +830,10 @@ class ControlsController extends CoreBase {
 	 * @returns
 	 * @access public
 	 */
-	exportPage(page, clone = true) {
+	exportPage(page: number, clone = true) {
 		const result = {}
 
-		for (let bank = 1; bank <= global.MAX_BUTTONS; bank++) {
+		for (let bank = 1; bank <= MAX_BUTTONS; bank++) {
 			const controlId = CreateBankControlId(page, bank)
 			const control = this.getControl(controlId)
 			if (control) result[controlId] = control.toJSON(clone)
@@ -788,9 +847,9 @@ class ControlsController extends CoreBase {
 	 * @param {string} instanceId
 	 * @access public
 	 */
-	forgetInstance(instanceId) {
+	forgetInstance(instanceId: string): void {
 		for (const control of Object.values(this.#controls)) {
-			if (typeof control.forgetInstance === 'function') {
+			if (typeof control?.forgetInstance === 'function') {
 				control.forgetInstance(instanceId)
 			}
 		}
@@ -814,7 +873,7 @@ class ControlsController extends CoreBase {
 	 * @returns
 	 * @access public
 	 */
-	getControl(controlId) {
+	getControl(controlId: string): SomeControl | undefined {
 		return this.#controls[controlId]
 	}
 
@@ -825,7 +884,7 @@ class ControlsController extends CoreBase {
 	 * @returns
 	 * @access public
 	 */
-	importControl(controlId, definition) {
+	importControl(controlId: string, definition) {
 		if (!this.#validateBankControlId(controlId)) {
 			// Control id is not valid!
 			return false
@@ -851,7 +910,7 @@ class ControlsController extends CoreBase {
 	 * @param {Array} removedVariables - variables that have been removed
 	 * @access public
 	 */
-	onVariablesChanged(changedVariables, removedVariables) {
+	onVariablesChanged(changedVariables: Record<string, any>, removedVariables: string[]) {
 		const allChangedVariables = [...removedVariables, ...Object.keys(changedVariables)]
 
 		// Inform triggers of the change
@@ -874,7 +933,7 @@ class ControlsController extends CoreBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	pressControl(controlId, pressed, deviceId) {
+	pressControl(controlId: string, pressed: boolean, deviceId: string | undefined) {
 		const control = this.getControl(controlId)
 		if (control && typeof control.pressControl === 'function') {
 			this.triggers.emit('control_press', controlId, pressed, deviceId)
@@ -895,7 +954,7 @@ class ControlsController extends CoreBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	rotateControl(controlId, direction, deviceId) {
+	rotateControl(controlId: string, direction: boolean, deviceId: string | undefined) {
 		const control = this.getControl(controlId)
 		if (control && typeof control.rotateControl === 'function') {
 			control.rotateControl(direction, deviceId)
@@ -911,7 +970,7 @@ class ControlsController extends CoreBase {
 	 * @param {string} tolabel - the new instance short name
 	 * @access public
 	 */
-	renameVariables(labelFrom, labelTo) {
+	renameVariables(labelFrom: string, labelTo: string): void {
 		for (const control of Object.values(this.#controls)) {
 			if (typeof control.renameVariables === 'function') {
 				control.renameVariables(labelFrom, labelTo)
@@ -936,7 +995,7 @@ class ControlsController extends CoreBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	resetControl(controlId, newType) {
+	resetControl(controlId: string, newType?: string) {
 		const control = this.getControl(controlId)
 		if (control) {
 			control.destroy()
@@ -958,7 +1017,7 @@ class ControlsController extends CoreBase {
 
 		if (newType) {
 			// Initialise to new type
-			this.#controls[controlId] = this.#createClassForControl(controlId, 'bank', newType, null, false)
+			this.#controls[controlId] = this.#createClassForControl(controlId, 'bank', newType, null, false) ?? undefined
 		} else {
 			// Force a redraw
 			this.graphics.invalidateControl(controlId)
@@ -971,7 +1030,7 @@ class ControlsController extends CoreBase {
 	 * @param {object} result - object containing new values for the feedbacks that have changed
 	 * @access public
 	 */
-	updateFeedbackValues(instanceId, result) {
+	updateFeedbackValues(instanceId: string, result): void {
 		const values = {}
 
 		for (const item of result) {
@@ -995,11 +1054,11 @@ class ControlsController extends CoreBase {
 	 * @returns {boolean} control is valid
 	 * @access private
 	 */
-	#validateBankControlId(controlId) {
+	#validateBankControlId(controlId: string): boolean {
 		const parsed = ParseControlId(controlId)
 		if (parsed?.type !== 'bank') return false
 		if (parsed.page < 1 || parsed.page > 99) return false
-		if (parsed.bank < 1 || parsed.bank > global.MAX_BUTTONS) return false
+		if (parsed.bank < 1 || parsed.bank > MAX_BUTTONS) return false
 
 		return true
 	}
@@ -1010,7 +1069,7 @@ class ControlsController extends CoreBase {
 	 * @returns {boolean} control is valid
 	 * @access private
 	 */
-	#validateTriggerControlId(controlId) {
+	#validateTriggerControlId(controlId: string): boolean {
 		const parsed = ParseControlId(controlId)
 		if (parsed?.type !== 'trigger') return false
 
@@ -1021,7 +1080,7 @@ class ControlsController extends CoreBase {
 	 * Prune any items on controls which belong to an unknown instanceId
 	 * @access public
 	 */
-	verifyInstanceIds() {
+	verifyInstanceIds(): void {
 		const knownInstanceIds = new Set(this.instance.getAllInstanceIds())
 		knownInstanceIds.add('internal')
 

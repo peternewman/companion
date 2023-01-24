@@ -1,4 +1,4 @@
-import ControlBase from '../../ControlBase.js'
+import ControlBase, { ControlBaseWithFeedbacks } from '../../ControlBase.js'
 import { rgb, GetButtonBitmapSize, Size } from '../../../Resources/Util.js'
 import { ParseControlId } from '../../../Shared/ControlId.js'
 import { cloneDeep } from 'lodash-es'
@@ -32,10 +32,10 @@ export interface ButtonControlBaseOptions {
  * develop commercial activities involving the Companion software without
  * disclosing the source code of your own applications.
  */
-export default abstract class ButtonControlBase<TConfigJson, TRuntimeJson, TOptions, TStepOptions> extends ControlBase<
-	TConfigJson,
-	TRuntimeJson
-> {
+export default abstract class ButtonControlBase<TConfigJson, TRuntimeJson, TOptions, TStepOptions>
+	extends ControlBase<TConfigJson, TRuntimeJson>
+	implements ControlBaseWithFeedbacks<ButtonDrawStyleBase>
+{
 	/**
 	 * The defaults style for a button
 	 * @type {Object}
@@ -177,7 +177,7 @@ export default abstract class ButtonControlBase<TConfigJson, TRuntimeJson, TOpti
 	 * @param {string} instanceId
 	 * @access public
 	 */
-	forgetInstance(instanceId: string) {
+	forgetInstance(instanceId: string): void {
 		const changedFeedbacks = this.feedbacks.forgetInstance(instanceId)
 
 		let changedSteps = false
@@ -385,7 +385,7 @@ export default abstract class ButtonControlBase<TConfigJson, TRuntimeJson, TOpti
 	 * @returns {boolean} true if any changes were made
 	 * @access public
 	 */
-	styleSetFields(diff: Partial<ButtonDrawStyleBase>) {
+	styleSetFields(diff: Partial<ButtonDrawStyleBase>): boolean {
 		if (diff.png64) {
 			// Strip the prefix off the base64 png
 			if (typeof diff.png64 === 'string' && diff.png64.match(/data:.*?image\/png/)) {
