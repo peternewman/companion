@@ -29,6 +29,7 @@ import { cloneDeep } from 'lodash-es'
 import { ParseControlId } from '../Shared/ControlId.js'
 import type { ActionInstance, Registry, RunActionExtras } from '../tmp.js'
 import type { InternalFragment } from './FragmantBase.js'
+import type { InstanceStatus } from '../Instance/Status.js'
 
 export default class InternalController extends CoreBase {
 	feedbacks = new Map()
@@ -39,15 +40,15 @@ export default class InternalController extends CoreBase {
 		super(registry, 'internal', 'Internal/Controller')
 
 		this.fragments = [
-			new ActionRecorder(registry, this),
-			new Instance(registry, this),
-			new Time(registry, this),
-			new Controls(registry, this),
-			new CustomVariables(registry, this),
-			new Surface(registry, this),
-			new System(registry, this),
-			new Triggers(registry, this),
-			new Variables(registry, this),
+			new ActionRecorder(registry),
+			new Instance(registry),
+			new Time(registry),
+			new Controls(registry),
+			new CustomVariables(registry),
+			new Surface(registry),
+			new System(registry),
+			new Triggers(registry),
+			new Variables(registry),
 		]
 
 		// Set everything up
@@ -271,7 +272,7 @@ export default class InternalController extends CoreBase {
 	}
 
 	// HACK - Can we avoid having everything make calls into this or its children?
-	calculateInstanceErrors(instance_statuses) {
+	calculateInstanceErrors(instance_statuses: Record<string, InstanceStatus | undefined>): void {
 		for (const fragment of this.fragments) {
 			if (typeof fragment.calculateInstanceErrors === 'function') {
 				fragment.calculateInstanceErrors(instance_statuses)

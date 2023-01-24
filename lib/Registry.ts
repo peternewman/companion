@@ -18,13 +18,12 @@ import SurfaceController from './Surface/Controller.js'
 import UIController from './UI/Controller.js'
 import UIHandler from './UI/Handler.js'
 import { sendOverIpc, showErrorMessage } from './Resources/Util.js'
-
-global.MAX_BUTTONS = 32
-global.MAX_BUTTONS_PER_ROW = 8
+import winston from 'winston'
+import { Registry as IRegistry } from './tmp.js'
 
 const pkgInfoStr = await fs.readFile(new URL('../package.json', import.meta.url))
 const pkgInfo = JSON.parse(pkgInfoStr.toString())
-let buildNumber
+let buildNumber: string
 try {
 	buildNumber = fs
 		.readFileSync(new URL('../BUILD', import.meta.url))
@@ -63,111 +62,117 @@ if (process.env.COMPANION_IPC_PARENT && !process.send) {
  * develop commercial activities involving the Companion software without
  * disclosing the source code of your own applications.
  */
-class Registry extends EventEmitter {
+class Registry extends EventEmitter implements IRegistry {
 	/**
 	 * The disk cache library
 	 * @type {DataCache}
 	 * @access public
 	 */
-	cache
+	cache!: DataCache
 	/**
 	 * The core controls controller
 	 * @type {ControlsController}
 	 * @access public
 	 */
-	controls
+	controls!: ControlsController
+
+	data!: DataController
 	/**
 	 * The core database library
 	 * @type {DataDatabase}
 	 * @access public
 	 */
-	db
+	db!: DataDatabase
 	/**
 	 * The core graphics controller
 	 * @type {GraphicsController}
 	 * @access public
 	 */
-	graphics
+	graphics!: GraphicsController
 	/**
 	 * The core instance controller
 	 * @type {InstanceController}
 	 * @access public
 	 */
-	instance
+	instance!: InstanceController
 	/**
 	 * The core interface client
 	 * @type {UIHandler}
 	 * @access public
 	 */
-	io
+	io!: UIHandler
+
+	cloud!: CloudController
+
+	ui!: UIController
 	/**
 	 * The logger
 	 * @type {LogController}
 	 * @access public
 	 * @deprecated
 	 */
-	log
+	log: typeof LogController
 	/**
 	 * The logger
 	 * @type {winston.Logger}
 	 * @access public
 	 */
-	logger
+	logger: winston.Logger
 	/**
 	 * The core page controller
 	 * @type {PageController}
 	 * @access public
 	 */
-	page
+	page!: PageController
 	/**
 	 * The core page controller
 	 * @type {GraphicsPreview}
 	 * @access public
 	 */
-	preview
+	preview!: GraphicsPreview
 	/**
 	 * The core service controller
 	 * @type {ServiceController}
 	 * @access public
 	 */
-	services
+	services!: ServiceController
 	/**
 	 * The core device controller
 	 * @type {SurfaceController}
 	 * @access public
 	 */
-	surfaces
-	/**
-	 * The modules' event emitter interface
-	 * @type {EventEmitter}
-	 * @access public
-	 */
-	system
+	surfaces!: SurfaceController
 	/**
 	 * The core user config manager
 	 * @type {DataUserConfig}
 	 * @access public
 	 */
-	userconfig
+	userconfig!: DataUserConfig
 
 	/**
 	 * The 'internal' module
 	 * @type {InternalController}
 	 * @access public
 	 */
-	internalModule
+	internalModule!: InternalController
 
 	/*
 	 * Express Router for /int api endpoints
 	 */
-	api_router
+	api_router: express.Router
+
+	configDir: string
+	machineId: string
+	appVersion: string
+	appBuild: string
+	pkgInfo: string
 
 	/**
 	 * Create a new application <code>Registry</code>
 	 * @param {string} configDir - the configuration path
 	 * @param {string} machineId - the machine uuid
 	 */
-	constructor(configDir, machineId) {
+	constructor(configDir: string, machineId: string) {
 		super()
 
 		if (!configDir) throw new Error(`Missing configDir`)
@@ -183,6 +188,8 @@ class Registry extends EventEmitter {
 		this.appVersion = pkgInfo.version
 		this.appBuild = buildNumber.replace(/^-/, '')
 		this.pkgInfo = pkgInfo
+
+		this.api_router = express.Router()
 	}
 
 	/**
@@ -191,10 +198,9 @@ class Registry extends EventEmitter {
 	 * @param {string} bind_ip
 	 * @param {number} http_port
 	 */
-	async ready(extraModulePath, bind_ip, http_port) {
+	async ready(extraModulePath: string, bind_ip: string, http_port: number): Promise<void> {
 		this.logger.debug('launching core modules')
 
-		this.api_router = new express.Router()
 		this.ui = new UIController(this)
 		this.io = this.ui.io
 		this.db = new DataDatabase(this)
@@ -230,14 +236,14 @@ class Registry extends EventEmitter {
 		this.controls.triggers.emit('startup')
 
 		if (process.env.COMPANION_IPC_PARENT) {
-			process.on('message', (msg) => {
+			process.on('message', (msg: any) => {
 				try {
 					if (msg.messageType === 'http-rebind') {
 						this.rebindHttp(msg.ip, msg.port)
 					} else if (msg.messageType === 'exit') {
 						this.exit(false, false)
 					} else if (msg.messageType === 'scan-usb') {
-						this.surfaces.triggerRefreshDevices().catch((e) => {
+						this.surfaces.triggerRefreshDevices().catch(() => {
 							showErrorMessage('USB Scan Error', 'Failed to scan for USB devices.')
 						})
 					} else if (msg.messageType === 'power-status') {
@@ -250,7 +256,7 @@ class Registry extends EventEmitter {
 		}
 	}
 
-	exit(fromInternal, restart) {
+	exit(fromInternal: boolean, restart: boolean): void {
 		Promise.resolve().then(async () => {
 			this.logger.info('somewhere, the system wants to exit. kthxbai')
 
@@ -285,7 +291,7 @@ class Registry extends EventEmitter {
 	 * @param {string} bind_ip
 	 * @param {number} http_port
 	 */
-	rebindHttp(bind_ip, http_port) {
+	rebindHttp(bind_ip: string, http_port: number): void {
 		// ensure the port looks reasonable
 		if (http_port < 1024 || http_port > 65535) {
 			http_port = 8000

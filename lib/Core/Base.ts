@@ -1,4 +1,17 @@
 import { EventEmitter } from 'events'
+import type { Registry } from '../tmp.js'
+import type winston from 'winston'
+import type DataCache from '../Data/Cache.js'
+import type ControlsController from '../Controls/Controller.js'
+import type DataDatabase from '../Data/Database.js'
+import type GraphicsController from '../Graphics/Controller.js'
+import type UIHandler from '../UI/Handler.js'
+import type PageController from '../Page/Controller.js'
+import type GraphicsPreview from '../Graphics/Preview.js'
+import type ServiceController from '../Service/Controller.js'
+import type SurfaceController from '../Surface/Controller.js'
+import type DataUserConfig from '../Data/UserConfig.js'
+import type InternalController from '../Internal/Controller.js'
 
 /**
  * Abstract class to be extended by most core classes.  Provides access to the
@@ -27,14 +40,14 @@ class CoreBase extends EventEmitter {
 	 * @type {Registry}
 	 * @access protected
 	 */
-	registry = null
+	registry: Registry
 
 	/**
 	 * The logger for this class
 	 * @type {winston.Logger}
 	 * @access protected
 	 */
-	logger
+	logger: winston.Logger
 
 	/**
 	 * This needs to be called in the extending class
@@ -43,7 +56,7 @@ class CoreBase extends EventEmitter {
 	 * @param {string} logSource - module name to be used in UI logs
 	 * @param {string} debugNamespace - module path to be used in the debugger
 	 */
-	constructor(registry, _logSource, debugNamespace) {
+	constructor(registry: Registry, _logSource: string, debugNamespace: string) {
 		super()
 
 		this.registry = registry
@@ -57,7 +70,7 @@ class CoreBase extends EventEmitter {
 	 * @access protected
 	 * @readonly
 	 */
-	get cache() {
+	get cache(): DataCache {
 		return this.registry.cache
 	}
 
@@ -67,7 +80,7 @@ class CoreBase extends EventEmitter {
 	 * @access protected
 	 * @readonly
 	 */
-	get controls() {
+	get controls(): ControlsController {
 		return this.registry.controls
 	}
 
@@ -77,7 +90,7 @@ class CoreBase extends EventEmitter {
 	 * @access protected
 	 * @readonly
 	 */
-	get db() {
+	get db(): DataDatabase {
 		return this.registry.db
 	}
 
@@ -87,7 +100,7 @@ class CoreBase extends EventEmitter {
 	 * @access protected
 	 * @readonly
 	 */
-	get graphics() {
+	get graphics(): GraphicsController {
 		return this.registry.graphics
 	}
 
@@ -107,7 +120,7 @@ class CoreBase extends EventEmitter {
 	 * @access protected
 	 * @readonly
 	 */
-	get io() {
+	get io(): UIHandler {
 		return this.registry.io
 	}
 
@@ -117,7 +130,7 @@ class CoreBase extends EventEmitter {
 	 * @access protected
 	 * @readonly
 	 */
-	get page() {
+	get page(): PageController {
 		return this.registry.page
 	}
 
@@ -127,7 +140,7 @@ class CoreBase extends EventEmitter {
 	 * @access protected
 	 * @readonly
 	 */
-	get preview() {
+	get preview(): GraphicsPreview {
 		return this.registry.preview
 	}
 
@@ -137,7 +150,7 @@ class CoreBase extends EventEmitter {
 	 * @access protected
 	 * @readonly
 	 */
-	get services() {
+	get services(): ServiceController {
 		return this.registry.services
 	}
 
@@ -147,7 +160,7 @@ class CoreBase extends EventEmitter {
 	 * @access protected
 	 * @readonly
 	 */
-	get surfaces() {
+	get surfaces(): SurfaceController {
 		return this.registry.surfaces
 	}
 
@@ -157,7 +170,7 @@ class CoreBase extends EventEmitter {
 	 * @access protected
 	 * @readonly
 	 */
-	get userconfig() {
+	get userconfig(): DataUserConfig {
 		return this.registry.userconfig
 	}
 
@@ -167,7 +180,7 @@ class CoreBase extends EventEmitter {
 	 * @access protected
 	 * @readonly
 	 */
-	get internalModule() {
+	get internalModule(): InternalController {
 		return this.registry.internalModule
 	}
 }

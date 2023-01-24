@@ -5,6 +5,7 @@ type TriggerEventsEvents = {
 	tick: [nowSeconds: number, unixTime: number]
 	trigger_enabled: [controlId: string, enabled: boolean]
 	client_connect: []
+	startup: []
 	variables_changed: [allChangedVariables: Set<string>]
 }
 

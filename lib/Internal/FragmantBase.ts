@@ -1,5 +1,6 @@
 import CoreBase from '../Core/Base.js'
 import type { ActionDefinition, FeedbackDefinition } from '../Instance/Definitions.js'
+import type { InstanceStatus } from '../Instance/Status.js'
 import type { ActionInstance, FeedbackInstance, RunActionExtras, VariableDefinition } from '../tmp.js'
 
 export abstract class InternalFragment extends CoreBase {
@@ -13,4 +14,6 @@ export abstract class InternalFragment extends CoreBase {
 
 	getVariableDefinitions?(): VariableDefinition[]
 	updateVariables?(): void
+
+	calculateInstanceErrors?(instance_statuses: Record<string, InstanceStatus | undefined>): void
 }

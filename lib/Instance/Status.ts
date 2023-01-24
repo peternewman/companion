@@ -74,7 +74,7 @@ class Status extends CoreBase {
 				break
 		}
 
-		const newStatuses = { ...this.#instanceStatuses }
+		const newStatuses: Record<string, InstanceStatus | undefined> = { ...this.#instanceStatuses }
 		newStatuses[instance_id] = {
 			category: category,
 			level: level,

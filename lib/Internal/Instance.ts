@@ -18,18 +18,20 @@
 import { combineRgb } from '@companion-module/base'
 import { rgb } from '../Resources/Util.js'
 import { InternalFragment } from './FragmantBase.js'
-import type { Registry } from '../tmp.js'
+import type { ActionInstance, FeedbackInstance, Registry, RunActionExtras, VariableDefinition } from '../tmp.js'
+import type { InstanceStatus } from '../Instance/Status.js'
+import { ActionDefinition, FeedbackDefinition } from '../Instance/Definitions.js'
 
 export default class Instance extends InternalFragment {
+	private instance_statuses: Record<string, InstanceStatus | undefined> = {}
+	private instance_errors = 0
+	private instance_warns = 0
+	private instance_oks = 0
+
 	constructor(registry: Registry) {
 		super(registry, 'internal', 'Internal/Instance')
 
 		// this.internalModule = internalModule
-
-		this.instance_statuses = {}
-		this.instance_errors = 0
-		this.instance_warns = 0
-		this.instance_oks = 0
 	}
 
 	getVariableDefinitions(): VariableDefinition[] {
@@ -171,11 +173,12 @@ export default class Instance extends InternalFragment {
 		}
 	}
 
-	override executeAction(action: ActionInstance, extras: RunActionExtras): boolean | undefined {
+	override executeAction(action: ActionInstance, _extras: RunActionExtras): boolean | undefined {
 		if (action.action === 'instance_control') {
 			this.registry.instance.enableDisableInstance(action.options.instance_id, action.options.enable == 'true')
 			return true
 		}
+		return undefined
 	}
 
 	override executeFeedback(feedback: FeedbackInstance): boolean | undefined {
@@ -236,6 +239,7 @@ export default class Instance extends InternalFragment {
 
 			return selected_status == feedback.options.state
 		}
+		return undefined
 	}
 
 	updateVariables(): void {
@@ -246,17 +250,17 @@ export default class Instance extends InternalFragment {
 		})
 	}
 
-	calculateInstanceErrors(instance_statuses): void {
+	calculateInstanceErrors(instance_statuses: Record<string, InstanceStatus | undefined>): void {
 		let numError = 0
 		let numWarn = 0
 		let numOk = 0
 
 		for (const status of Object.values(instance_statuses)) {
-			if (status.category === 'good') {
+			if (status?.category === 'good') {
 				numOk++
-			} else if (status.category === 'warning') {
+			} else if (status?.category === 'warning') {
 				numWarn++
-			} else if (status.category === 'error') {
+			} else if (status?.category === 'error') {
 				numError++
 			}
 		}
