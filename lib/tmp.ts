@@ -134,3 +134,10 @@ export interface VariableDefinition {
 	label: string
 	name: string
 }
+
+export interface RunActionExtras {
+	controlId: string
+	deviceid: string | undefined
+	page: number | undefined
+	bank: number | undefined
+}

@@ -3,10 +3,32 @@ import { nanoid } from 'nanoid'
 import CoreBase from '../Core/Base.js'
 import jsonPatch from 'fast-json-patch'
 import { clamp } from '../Resources/Util.js'
+import type { Registry, SocketClient } from '../tmp.js'
 
 const SessionListRoom = 'action-recorder:session-list'
-function SessionRoom(id) {
+function SessionRoom(id: string) {
 	return `action-recorder:session:${id}`
+}
+
+interface RecordingSession {
+	id: string
+	instanceIds: string[]
+	isRunning: boolean
+	actionDelay: number
+	actions: RecordingAction[]
+}
+interface RecordingAction {
+	id: string
+	instance: string
+	action: string
+	options: Record<string, any>
+	delay: number
+
+	uniquenessId: string | undefined
+}
+
+export interface RecordSessionListEntry {
+	instanceIds: string[]
 }
 
 /**
@@ -39,30 +61,30 @@ export default class ActionRecorder extends CoreBase {
 	 * Note: this may contain some ids which are not,
 	 * @access private
 	 */
-	#currentlyRecordingInstanceIds = new Set()
+	#currentlyRecordingInstanceIds = new Set<string>()
 
 	/**
 	 * Data from the current recording session
 	 * @access private
 	 */
-	#currentSession
+	#currentSession: RecordingSession
 
 	/**
 	 * The last sent info json object
 	 * @access private
 	 */
-	#lastSentSessionListJson = null
+	#lastSentSessionListJson: Record<string, RecordSessionListEntry> | null = null
 
 	/**
 	 * The last sent info json object
 	 * @access private
 	 */
-	#lastSentSessionInfoJsons = {}
+	#lastSentSessionInfoJsons: Record<string, unknown> = {}
 
 	/**
 	 * @param {Registry} registry - the application core
 	 */
-	constructor(registry) {
+	constructor(registry: Registry) {
 		super(registry, 'action-recorder', 'Control/ActionRecorder')
 
 		// create the 'default' session
@@ -82,7 +104,7 @@ export default class ActionRecorder extends CoreBase {
 	 * @param {SocketIO} client - the client socket
 	 * @access public
 	 */
-	clientConnect(client) {
+	clientConnect(client: SocketClient) {
 		client.onPromise('action-recorder:subscribe', () => {
 			client.join(SessionListRoom)
 
@@ -115,15 +137,15 @@ export default class ActionRecorder extends CoreBase {
 
 		// 	return id
 		// })
-		client.onPromise('action-recorder:session:abort', (sessionId) => {
+		client.onPromise('action-recorder:session:abort', (sessionId: string) => {
 			if (!this.#currentSession || this.#currentSession.id !== sessionId)
 				throw new Error(`Invalid session: ${sessionId}`)
 
-			this.destroySession()
+			this.destroySession(false)
 
 			return true
 		})
-		client.onPromise('action-recorder:session:discard-actions', (sessionId) => {
+		client.onPromise('action-recorder:session:discard-actions', (sessionId: string) => {
 			if (!this.#currentSession || this.#currentSession.id !== sessionId)
 				throw new Error(`Invalid session: ${sessionId}`)
 
@@ -131,7 +153,7 @@ export default class ActionRecorder extends CoreBase {
 
 			return true
 		})
-		client.onPromise('action-recorder:session:recording', (sessionId, isRunning) => {
+		client.onPromise('action-recorder:session:recording', (sessionId: string, isRunning: boolean) => {
 			if (!this.#currentSession || this.#currentSession.id !== sessionId)
 				throw new Error(`Invalid session: ${sessionId}`)
 
@@ -139,7 +161,7 @@ export default class ActionRecorder extends CoreBase {
 
 			return true
 		})
-		client.onPromise('action-recorder:session:set-instances', (sessionId, instanceIds) => {
+		client.onPromise('action-recorder:session:set-instances', (sessionId: string, instanceIds: string[]) => {
 			if (!this.#currentSession || this.#currentSession.id !== sessionId)
 				throw new Error(`Invalid session: ${sessionId}`)
 
@@ -148,7 +170,7 @@ export default class ActionRecorder extends CoreBase {
 			return true
 		})
 
-		client.onPromise('action-recorder:session:subscribe', (sessionId) => {
+		client.onPromise('action-recorder:session:subscribe', (sessionId: string) => {
 			if (!this.#currentSession || this.#currentSession.id !== sessionId)
 				throw new Error(`Invalid session: ${sessionId}`)
 
@@ -156,11 +178,11 @@ export default class ActionRecorder extends CoreBase {
 
 			return this.#lastSentSessionInfoJsons[sessionId]
 		})
-		client.onPromise('action-recorder:session:unsubscribe', (sessionId) => {
+		client.onPromise('action-recorder:session:unsubscribe', (sessionId: string) => {
 			client.leave(SessionRoom(sessionId))
 		})
 
-		client.onPromise('action-recorder:session:action-delete', (sessionId, actionId) => {
+		client.onPromise('action-recorder:session:action-delete', (sessionId: string, actionId: string) => {
 			if (!this.#currentSession || this.#currentSession.id !== sessionId)
 				throw new Error(`Invalid session: ${sessionId}`)
 
@@ -169,7 +191,7 @@ export default class ActionRecorder extends CoreBase {
 
 			this.commitChanges([sessionId])
 		})
-		client.onPromise('action-recorder:session:action-duplicate', (sessionId, actionId) => {
+		client.onPromise('action-recorder:session:action-duplicate', (sessionId: string, actionId: string) => {
 			if (!this.#currentSession || this.#currentSession.id !== sessionId)
 				throw new Error(`Invalid session: ${sessionId}`)
 
@@ -183,7 +205,7 @@ export default class ActionRecorder extends CoreBase {
 				this.commitChanges([sessionId])
 			}
 		})
-		client.onPromise('action-recorder:session:action-delay', (sessionId, actionId, delay0) => {
+		client.onPromise('action-recorder:session:action-delay', (sessionId: string, actionId: string, delay0: number) => {
 			if (!this.#currentSession || this.#currentSession.id !== sessionId)
 				throw new Error(`Invalid session: ${sessionId}`)
 
@@ -199,37 +221,46 @@ export default class ActionRecorder extends CoreBase {
 				this.commitChanges([sessionId])
 			}
 		})
-		client.onPromise('action-recorder:session:action-set-value', (sessionId, actionId, key, value) => {
-			if (!this.#currentSession || this.#currentSession.id !== sessionId)
-				throw new Error(`Invalid session: ${sessionId}`)
+		client.onPromise(
+			'action-recorder:session:action-set-value',
+			(sessionId: string, actionId: string, key: string, value: any) => {
+				if (!this.#currentSession || this.#currentSession.id !== sessionId)
+					throw new Error(`Invalid session: ${sessionId}`)
 
-			// Find and update the action
-			const index = this.#currentSession.actions.findIndex((a) => a.id === actionId)
-			if (index !== -1) {
-				const action = this.#currentSession.actions[index]
+				// Find and update the action
+				const index = this.#currentSession.actions.findIndex((a) => a.id === actionId)
+				if (index !== -1) {
+					const action = this.#currentSession.actions[index]
 
-				if (!action.options) action.options = {}
-				action.options[key] = value
+					if (!action.options) action.options = {}
+					action.options[key] = value
+
+					this.commitChanges([sessionId])
+				}
+			}
+		)
+		client.onPromise(
+			'action-recorder:session:action-reorder',
+			(sessionId: string, oldIndex: number, newIndex: number) => {
+				if (!this.#currentSession || this.#currentSession.id !== sessionId)
+					throw new Error(`Invalid session: ${sessionId}`)
+
+				oldIndex = clamp(oldIndex, 0, this.#currentSession.actions.length)
+				newIndex = clamp(newIndex, 0, this.#currentSession.actions.length)
+				this.#currentSession.actions.splice(newIndex, 0, ...this.#currentSession.actions.splice(oldIndex, 1))
 
 				this.commitChanges([sessionId])
 			}
-		})
-		client.onPromise('action-recorder:session:action-reorder', (sessionId, oldIndex, newIndex) => {
-			if (!this.#currentSession || this.#currentSession.id !== sessionId)
-				throw new Error(`Invalid session: ${sessionId}`)
+		)
+		client.onPromise(
+			'action-recorder:session:save-to-control',
+			(sessionId: string, controlId: string, stepId: string, setId: string, mode: 'replace' | 'append') => {
+				if (!this.#currentSession || this.#currentSession.id !== sessionId)
+					throw new Error(`Invalid session: ${sessionId}`)
 
-			oldIndex = clamp(oldIndex, 0, this.#currentSession.actions.length)
-			newIndex = clamp(newIndex, 0, this.#currentSession.actions.length)
-			this.#currentSession.actions.splice(newIndex, 0, ...this.#currentSession.actions.splice(oldIndex, 1))
-
-			this.commitChanges([sessionId])
-		})
-		client.onPromise('action-recorder:session:save-to-control', (sessionId, controlId, stepId, setId, mode) => {
-			if (!this.#currentSession || this.#currentSession.id !== sessionId)
-				throw new Error(`Invalid session: ${sessionId}`)
-
-			this.saveToControlId(controlId, stepId, setId, mode)
-		})
+				this.saveToControlId(controlId, stepId, setId, mode)
+			}
+		)
 	}
 
 	/**
@@ -238,7 +269,7 @@ export default class ActionRecorder extends CoreBase {
 	 * @param {Array<string>} sessionIds any sessions that have changed and should be diffed
 	 * @access protected
 	 */
-	commitChanges(sessionIds) {
+	commitChanges(sessionIds: string[]) {
 		if (sessionIds && Array.isArray(sessionIds)) {
 			for (const sessionId of sessionIds) {
 				const sessionInfo = this.#currentSession && this.#currentSession.id === sessionId ? this.#currentSession : null
@@ -261,7 +292,7 @@ export default class ActionRecorder extends CoreBase {
 			}
 		}
 
-		const newSessionListJson = {}
+		const newSessionListJson: Record<string, RecordSessionListEntry> = {}
 
 		if (this.#currentSession) {
 			newSessionListJson[this.#currentSession.id] = {
@@ -286,7 +317,7 @@ export default class ActionRecorder extends CoreBase {
 	 * Note: this discards any actions that havent yet been added to a control
 	 * @access public
 	 */
-	destroySession(preserveInstances) {
+	destroySession(preserveInstances: boolean): void {
 		const oldSession = this.#currentSession
 
 		this.#currentSession.isRunning = false
@@ -311,13 +342,13 @@ export default class ActionRecorder extends CoreBase {
 	/**
 	 * Discard all the actions currently held in the recording session
 	 */
-	discardActions() {
+	discardActions(): void {
 		this.#currentSession.actions = []
 
 		this.commitChanges([this.#currentSession.id])
 	}
 
-	getSession() {
+	getSession(): RecordingSession {
 		return this.#currentSession
 	}
 
@@ -326,14 +357,14 @@ export default class ActionRecorder extends CoreBase {
 	 * @param {string} instanceId
 	 * @param {boolean} running Whether it is now running
 	 */
-	instanceAvailabilityChange(instanceId, running) {
+	instanceAvailabilityChange(instanceId: string, running: boolean): void {
 		if (!running) {
 			if (this.#currentSession) {
 				// Remove the instance which has stopped
 				const newIds = this.#currentSession.instanceIds.filter((id) => id !== instanceId)
 
 				if (newIds.length !== this.#currentSession.instanceIds.length) {
-					this.commitChanges(this.#currentSession)
+					this.commitChanges([this.#currentSession.id])
 				}
 			}
 		}
@@ -343,14 +374,19 @@ export default class ActionRecorder extends CoreBase {
 	 * Add an action received from an instance to the session
 	 * @access public
 	 */
-	receiveAction(instanceId, actionId, options, uniquenessId) {
+	receiveAction(
+		instanceId: string,
+		actionId: string,
+		options: Record<string, any>,
+		uniquenessId: string | undefined
+	): void {
 		const changedSessionIds = []
 
 		if (this.#currentSession) {
 			const session = this.#currentSession
 
 			if (session.instanceIds.includes(instanceId)) {
-				const newAction = {
+				const newAction: RecordingAction = {
 					id: nanoid(),
 					instance: instanceId,
 					action: actionId,
@@ -386,7 +422,7 @@ export default class ActionRecorder extends CoreBase {
 	 * @param {string} setId The action-set to write to (if applicable)
 	 * @param {string} mode 'replace' or 'append'
 	 */
-	saveToControlId(controlId, stepId, setId, mode) {
+	saveToControlId(controlId: string, stepId: string, setId: string, mode: 'replace' | 'append'): void {
 		if (mode !== 'replace' && mode !== 'append') throw new Error(`Invalid mode: ${mode}`)
 
 		const control = this.controls.getControl(controlId)
@@ -413,7 +449,7 @@ export default class ActionRecorder extends CoreBase {
 	 * Set the current session as recording
 	 * @param {boolean} isRunning
 	 */
-	setRecording(isRunning) {
+	setRecording(isRunning: boolean): void {
 		this.#currentSession.isRunning = !!isRunning
 		this.#syncRecording()
 
@@ -424,7 +460,7 @@ export default class ActionRecorder extends CoreBase {
 	 * Set the current instances being recorded from
 	 * @param {Array<string>} instanceIds0
 	 */
-	setSelectedInstanceIds(instanceIds0) {
+	setSelectedInstanceIds(instanceIds0: string[]): void {
 		if (!Array.isArray(instanceIds0)) throw new Error('Expected array of instance ids')
 		const allValidIds = new Set(this.instance.getAllInstanceIds())
 		const instanceIds = instanceIds0.filter((id) => allValidIds.has(id))
@@ -439,10 +475,10 @@ export default class ActionRecorder extends CoreBase {
 	 * Sync the correct recording status to each instance
 	 * @access private
 	 */
-	#syncRecording() {
-		const ps = []
+	#syncRecording(): void {
+		const ps: Promise<unknown>[] = []
 
-		const targetRecordingInstanceIds = new Set()
+		const targetRecordingInstanceIds = new Set<string>()
 		if (this.#currentSession && this.#currentSession.isRunning) {
 			for (const id of this.#currentSession.instanceIds) {
 				targetRecordingInstanceIds.add(id)
@@ -455,7 +491,7 @@ export default class ActionRecorder extends CoreBase {
 			const instance = this.instance.moduleHost.getChild(instanceId)
 			if (instance) {
 				ps.push(
-					instance.startStopRecordingActions(true).catch((e) => {
+					instance.startStopRecordingActions(true).catch((e: any) => {
 						this.logger.warn(`Failed to start recording for "${instanceId}": ${e}`)
 					})
 				)
@@ -468,7 +504,7 @@ export default class ActionRecorder extends CoreBase {
 				const instance = this.instance.moduleHost.getChild(instanceId)
 				if (instance) {
 					ps.push(
-						instance.startStopRecordingActions(false).catch((e) => {
+						instance.startStopRecordingActions(false).catch((e: any) => {
 							this.logger.warn(`Failed to stop recording for "${instanceId}": ${e}`)
 						})
 					)

@@ -1,5 +1,7 @@
 import CoreBase from '../Core/Base.js'
+import { MAX_BUTTONS } from '../Resources/Constants.js'
 import { CreateBankControlId, ParseControlId } from '../Shared/ControlId.js'
+import type { ActionInstance, Registry, RunActionExtras } from '../tmp.js'
 
 /**
  * Class to handle execution of actions.
@@ -27,12 +29,12 @@ export default class ActionRunner extends CoreBase {
 	 * Timers for all pending delayed actions
 	 * @access private
 	 */
-	#timers_running = new Map()
+	#timers_running = new Map<NodeJS.Timer, string>()
 
 	/**
 	 * @param {Registry} registry - the application core
 	 */
-	constructor(registry) {
+	constructor(registry: Registry) {
 		super(registry, 'action-runner', 'Control/ActionRunner')
 	}
 
@@ -40,10 +42,10 @@ export default class ActionRunner extends CoreBase {
 	 * Abort all pending delayed actions
 	 * @access public
 	 */
-	abortAllDelayed() {
+	abortAllDelayed(): void {
 		this.logger.silly('Aborting delayed actions')
 
-		const affectedControlIds = new Set()
+		const affectedControlIds = new Set<string>()
 
 		// Clear the timers
 		for (const [timer, controlId] of this.#timers_running.entries()) {
@@ -61,10 +63,10 @@ export default class ActionRunner extends CoreBase {
 	/**
 	 * Abort pending delayed actions for a control
 	 * @param {string} controlId Id of the control
-	 * @param {boolean} skip_up Mark button as released
+	 * @param {boolean} skipUp Mark button as released
 	 * @access public
 	 */
-	abortControlDelayed(controlId, skip_up) {
+	abortControlDelayed(controlId: string, skipUp: boolean): void {
 		// Clear any timers
 		let cleared = false
 		for (const [timer, timerControlId] of this.#timers_running.entries()) {
@@ -80,7 +82,7 @@ export default class ActionRunner extends CoreBase {
 		}
 
 		// Update control
-		this.#setControlIsRunning(controlId, false, skip_up)
+		this.#setControlIsRunning(controlId, false, skipUp)
 	}
 
 	/**
@@ -89,8 +91,8 @@ export default class ActionRunner extends CoreBase {
 	 * @param {string[]} skipControlIds Ids of the controls to skip
 	 * @access public
 	 */
-	abortPageDelayed(page, skipControlIds) {
-		for (let bank = 1; bank <= global.MAX_BUTTONS; bank++) {
+	abortPageDelayed(page: number, skipControlIds: string[]): void {
+		for (let bank = 1; bank <= MAX_BUTTONS; bank++) {
 			const controlId = CreateBankControlId(page, bank)
 
 			if (skipControlIds && skipControlIds.includes(controlId)) {
@@ -109,13 +111,13 @@ export default class ActionRunner extends CoreBase {
 	 * @param {*} extras
 	 * @access private
 	 */
-	#runAction(action, extras) {
+	#runAction(action: ActionInstance, extras: RunActionExtras): void {
 		if (action.instance === 'internal') {
 			this.internalModule.executeAction(action, extras)
 		} else {
 			const instance = this.instance.moduleHost.getChild(action.instance)
 			if (instance) {
-				instance.actionRun(action, extras).catch((e) => {
+				instance.actionRun(action, extras).catch((e: any) => {
 					this.logger.silly(`Error executing action for ${instance.connectionId}: ${e.message ?? e}`)
 				})
 			} else {
@@ -128,12 +130,12 @@ export default class ActionRunner extends CoreBase {
 	 * Inform a control whether actions are running
 	 * @param {string} controlId
 	 * @param {boolean} running
-	 * @param {boolean} skip_up
+	 * @param {boolean} skipUp
 	 */
-	#setControlIsRunning(controlId, running, skip_up) {
+	#setControlIsRunning(controlId: string, running: boolean, skipUp?: boolean): void {
 		const control = this.controls.getControl(controlId)
 		if (control && typeof control.setActionsRunning === 'function') {
-			control.setActionsRunning(running, skip_up)
+			control.setActionsRunning(running, skipUp)
 		}
 	}
 
@@ -145,7 +147,12 @@ export default class ActionRunner extends CoreBase {
 	 * @param {object} extras
 	 * @access public
 	 */
-	runMultipleActions(actions0, controlId, relative_delay, extra) {
+	runMultipleActions(
+		actions0: ActionInstance[],
+		controlId: string,
+		relative_delay: boolean,
+		extra?: { deviceid: string | undefined }
+	): void {
 		const actions = actions0.filter((act) => !act.disabled)
 
 		if (actions.length === 0) {
@@ -153,10 +160,10 @@ export default class ActionRunner extends CoreBase {
 		}
 
 		// Handle whether the delays are absolute or relative.
-		const effective_delays = {}
+		const effective_delays: Record<string, number> = {}
 		let tmp_delay = 0
 		for (const action of actions) {
-			let this_delay = !action.delay ? 0 : parseInt(action.delay)
+			let this_delay = !action.delay ? 0 : Number(action.delay)
 			if (isNaN(this_delay)) this_delay = 0
 
 			if (relative_delay) {
@@ -171,9 +178,11 @@ export default class ActionRunner extends CoreBase {
 			effective_delays[action.id] = tmp_delay
 		}
 
-		const extra2 = {
-			...(extra || {}),
+		const extra2: RunActionExtras = {
 			controlId,
+			deviceid: extra?.deviceid,
+			page: undefined,
+			bank: undefined,
 		}
 		const parsed = ParseControlId(controlId)
 		if (parsed?.type === 'bank') {

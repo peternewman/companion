@@ -1,7 +1,6 @@
 import ControlBase from '../../ControlBase.js'
 import FragmentActions from '../../Fragments/FragmentActions.js'
 import FragmentFeedbacks from '../../Fragments/FragmentFeedbacks.js'
-import Registry from '../../../Registry.js'
 import { TriggersListRoom } from '../../Controller.js'
 import { cloneDeep } from 'lodash-es'
 import jsonPatch from 'fast-json-patch'
@@ -10,6 +9,30 @@ import TriggersEventTimer from './Events/Timer.js'
 import TriggersEventMisc from './Events/Misc.js'
 import { clamp } from '../../../Resources/Util.js'
 import TriggersEventVariables from './Events/Variable.js'
+import type { ActionInstance, FeedbackInstance, Registry, TriggerEventInstance } from '../../../tmp.js'
+import { nanoid } from 'nanoid'
+import TriggerEvents from '../../TriggerEvents.js'
+
+export interface TriggerInfo extends TriggerOptions {
+	type: 'trigger'
+	lastExecuted: number | undefined
+	description: string
+}
+
+export interface TriggerConfig {
+	type: 'trigger'
+	options: TriggerOptions
+	action_sets: Record<string, ActionInstance[]>
+	condition: FeedbackInstance[]
+	events: TriggerEventInstance[]
+}
+
+export interface TriggerOptions {
+	name: string
+	enabled: boolean
+	sortOrder: number
+	relativeDelay: boolean
+}
 
 /**
  * Class for an interval trigger.
@@ -32,8 +55,8 @@ import TriggersEventVariables from './Events/Variable.js'
  * develop commercial activities involving the Companion software without
  * disclosing the source code of your own applications.
  */
-export default class ControlTrigger extends ControlBase {
-	type = 'trigger'
+export default class ControlTrigger extends ControlBase<TriggerConfig> {
+	readonly type = 'trigger'
 
 	/**
 	 * The defaults options for a trigger
@@ -41,7 +64,7 @@ export default class ControlTrigger extends ControlBase {
 	 * @access public
 	 * @static
 	 */
-	static DefaultOptions = {
+	static DefaultOptions: TriggerOptions = {
 		name: 'New Trigger',
 		enabled: false,
 		sortOrder: 0,
@@ -53,7 +76,7 @@ export default class ControlTrigger extends ControlBase {
 	 * @type {Array}
 	 * @access private
 	 */
-	#conditionCheckEvents = new Set()
+	#conditionCheckEvents = new Set<string>()
 
 	/**
 	 * Last value of the condition
@@ -67,53 +90,56 @@ export default class ControlTrigger extends ControlBase {
 	 * @type {EventEmitter}
 	 * @access private
 	 */
-	#eventBus
+	#eventBus: TriggerEvents
 
 	/**
 	 * The last time the trigger was executed
 	 * @type {number}
 	 * @access private
 	 */
-	#lastExecuted = undefined
+	#lastExecuted: number | undefined = undefined
 
 	/**
 	 * The last sent trigger json object
 	 * @access private
 	 */
-	#lastSentTriggerJson = null
+	#lastSentTriggerJson: TriggerInfo | null = null
 
 	/**
 	 * The events for this trigger
 	 * @access public
 	 */
-	events = []
+	events: TriggerEventInstance[] = []
 
 	/**
 	 * Miscellaneous trigger events helper
 	 * @type {TriggersEventMisc}
 	 * @access private
 	 */
-	#miscEvents
+	#miscEvents: TriggersEventMisc
 
 	/**
 	 * Basic trigger configuration
 	 * @access public
 	 */
-	options = {}
+	options: TriggerOptions
 
 	/**
 	 * Timer based trigger events helper
 	 * @type {TriggersEventTimer}
 	 * @access private
 	 */
-	#timerEvents
+	#timerEvents: TriggersEventTimer
 
 	/**
 	 * Variables based trigger events helper
 	 * @type {TriggersEventVariables}
 	 * @access private
 	 */
-	#variablesEvents
+	#variablesEvents: TriggersEventVariables
+
+	actions: FragmentActions
+	feedbacks: FragmentFeedbacks<Record<string, never>>
 
 	/**
 	 * @param {Registry} registry - the application core
@@ -121,7 +147,13 @@ export default class ControlTrigger extends ControlBase {
 	 * @param {object} storage - persisted storage object
 	 * @param {boolean} isImport - if this is importing a button, not creating at startup
 	 */
-	constructor(registry, eventBus, controlId, storage, isImport) {
+	constructor(
+		registry: Registry,
+		eventBus: TriggerEvents,
+		controlId: string,
+		storage: TriggerConfig,
+		isImport: boolean
+	) {
 		super(registry, controlId, 'trigger', 'Controls/ControlTypes/Triggers')
 
 		this.actions = new FragmentActions(
@@ -168,7 +200,7 @@ export default class ControlTrigger extends ControlBase {
 			if (isImport) this.commitChange()
 		}
 
-		this.#setupEvents(this.options.enabled)
+		this.#setupEvents()
 	}
 
 	/**
@@ -179,7 +211,7 @@ export default class ControlTrigger extends ControlBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionAdd(_stepId, _setId, actionItem) {
+	actionAdd(_stepId: string, _setId: string, actionItem: ActionInstance) {
 		return this.actions.actionAdd('0', actionItem)
 	}
 
@@ -190,7 +222,7 @@ export default class ControlTrigger extends ControlBase {
 	 * @param {Array} newActions actions to append
 	 * @access public
 	 */
-	actionAppend(_stepId, _setId, newActions) {
+	actionAppend(_stepId: string, _setId: string, newActions: ActionInstance[]) {
 		return this.actions.actionAppend('0', newActions)
 	}
 
@@ -202,7 +234,7 @@ export default class ControlTrigger extends ControlBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	async actionLearn(_stepId, _setId, id) {
+	async actionLearn(_stepId: string, _setId: string, id: string) {
 		return this.actions.actionLearn('0', id)
 	}
 
@@ -214,7 +246,7 @@ export default class ControlTrigger extends ControlBase {
 	 * @param {boolean} enabled
 	 * @access public
 	 */
-	actionEnabled(_stepId, _setId, id, enabled) {
+	actionEnabled(_stepId: string, _setId: string, id: string, enabled: boolean) {
 		return this.actions.actionEnabled('0', id, enabled)
 	}
 
@@ -226,7 +258,7 @@ export default class ControlTrigger extends ControlBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionRemove(_stepId, _setId, id) {
+	actionRemove(_stepId: string, _setId: string, id: string) {
 		return this.actions.actionRemove('0', id)
 	}
 
@@ -238,7 +270,7 @@ export default class ControlTrigger extends ControlBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionDuplicate(_stepId, _setId, id) {
+	actionDuplicate(_stepId: string, _setId: string, id: string) {
 		return this.actions.actionDuplicate('0', id)
 	}
 
@@ -249,7 +281,7 @@ export default class ControlTrigger extends ControlBase {
 	 * @param {Array} newActions actions to populate
 	 * @access public
 	 */
-	actionReplaceAll(_stepId, _setId, newActions) {
+	actionReplaceAll(_stepId: string, _setId: string, newActions: ActionInstance[]) {
 		return this.actions.actionReplaceAll('0', newActions)
 	}
 
@@ -262,7 +294,7 @@ export default class ControlTrigger extends ControlBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionSetDelay(_stepId, _setId, id, delay) {
+	actionSetDelay(_stepId: string, _setId: string, id: string, delay: number) {
 		return this.actions.actionSetDelay('0', id, delay)
 	}
 
@@ -276,7 +308,7 @@ export default class ControlTrigger extends ControlBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionSetOption(_stepId, _setId, id, key, value) {
+	actionSetOption(_stepId: string, _setId: string, id: string, key: string, value: any) {
 		return this.actions.actionSetOption('0', id, key, value)
 	}
 
@@ -291,8 +323,15 @@ export default class ControlTrigger extends ControlBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionReorder(_dragStepId, _dragSetId, dragIndex, _dropStepId, _dropSetId, dropIndex) {
-		const set = this.actionsaction_sets['0']
+	actionReorder(
+		_dragStepId: string,
+		_dragSetId: string,
+		dragIndex: number,
+		_dropStepId: string,
+		_dropSetId: string,
+		dropIndex: number
+	): boolean {
+		const set = this.actions.action_sets['0']
 		if (set) {
 			dragIndex = clamp(dragIndex, 0, set.length)
 			dropIndex = clamp(dropIndex, 0, set.length)
@@ -307,11 +346,11 @@ export default class ControlTrigger extends ControlBase {
 		return false
 	}
 
-	checkButtonStatus() {
+	checkButtonStatus(): void {
 		// Ignore
 	}
 
-	executeActions(nowTime, isTest) {
+	executeActions(nowTime: number, isTest?: boolean): void {
 		if (isTest) {
 			this.logger.debug(`Test Execute ${this.options.name}`)
 		} else {
@@ -340,8 +379,8 @@ export default class ControlTrigger extends ControlBase {
 	/**
 	 * Get all the actions on this control
 	 */
-	getAllActions() {
-		const actions = []
+	getAllActions(): ActionInstance[] {
+		const actions: ActionInstance[] = []
 
 		for (const set of Object.values(this.actions.action_sets)) {
 			actions.push(...set)
@@ -356,8 +395,8 @@ export default class ControlTrigger extends ControlBase {
 	 * @param {boolean} clone - Whether to return a cloned object
 	 * @access public
 	 */
-	toJSON(clone = true) {
-		const obj = {
+	toJSON(clone = true): TriggerConfig {
+		const obj: TriggerConfig = {
 			type: this.type,
 			options: this.options,
 			action_sets: this.actions.action_sets,
@@ -367,8 +406,8 @@ export default class ControlTrigger extends ControlBase {
 		return clone ? cloneDeep(obj) : obj
 	}
 
-	toTriggerJSON() {
-		const eventStrings = []
+	toTriggerJSON(): TriggerInfo {
+		const eventStrings: string[] = []
 		for (const event of this.events) {
 			if (event.enabled) {
 				switch (event.type) {
@@ -416,7 +455,7 @@ export default class ControlTrigger extends ControlBase {
 	 * @param {string} instanceId
 	 * @access public
 	 */
-	forgetInstance(instanceId) {
+	forgetInstance(instanceId: string): void {
 		const changedFeedbacks = this.feedbacks.forgetInstance(instanceId)
 		const changedActions = this.actions.forgetInstance(instanceId)
 
@@ -428,7 +467,7 @@ export default class ControlTrigger extends ControlBase {
 	/**
 	 * Start or stop the trigger from running
 	 */
-	#setupEvents() {
+	#setupEvents(): void {
 		this.#timerEvents.setEnabled(this.options.enabled)
 		this.#miscEvents.setEnabled(this.options.enabled)
 		this.#variablesEvents.setEnabled(this.options.enabled)
@@ -440,7 +479,7 @@ export default class ControlTrigger extends ControlBase {
 		}
 	}
 
-	#restartEvent(event) {
+	#restartEvent(event: TriggerEventInstance): void {
 		if (event.enabled) {
 			switch (event.type) {
 				case 'interval':
@@ -476,7 +515,7 @@ export default class ControlTrigger extends ControlBase {
 			this.#stopEvent(event)
 		}
 	}
-	#stopEvent(event) {
+	#stopEvent(event: TriggerEventInstance): void {
 		switch (event.type) {
 			case 'interval':
 				this.#timerEvents.clearInterval(event.id)
@@ -510,7 +549,7 @@ export default class ControlTrigger extends ControlBase {
 	 * Update an option field of this control
 	 * @access public
 	 */
-	optionsSetField(key, value, forceSet) {
+	optionsSetField<K extends keyof TriggerOptions>(key: K, value: TriggerOptions[K], forceSet: boolean): boolean {
 		if (!forceSet && key === 'sortOrder') throw new Error('sortOrder cannot be set by the client')
 
 		this.options[key] = value
@@ -551,7 +590,7 @@ export default class ControlTrigger extends ControlBase {
 	 * @param {Set<string>} knownInstanceIds
 	 * @access public
 	 */
-	verifyInstanceIds(knownInstanceIds) {
+	verifyInstanceIds(knownInstanceIds: Set<string>): void {
 		const changedActions = this.actions.verifyInstanceIds(knownInstanceIds)
 		const changedFeedbacks = this.feedbacks.verifyInstanceIds(knownInstanceIds)
 
@@ -561,12 +600,12 @@ export default class ControlTrigger extends ControlBase {
 	}
 
 	/**
-	 * Emit a change to the runtime properties of this control.
+	 * Emit a change to the trigger properties of this control.
 	 * This is for any properties that the ui may want about this control which are not persisted in toJSON()
-	 * This is done via this.toRuntimeJSON()
+	 * This is done via this.toTriggerJSON()
 	 * @access protected
 	 */
-	#sendTriggerJsonChange() {
+	#sendTriggerJsonChange(): void {
 		const newJson = cloneDeep(this.toTriggerJSON())
 
 		if (this.io.countRoomMembers(TriggersListRoom) > 0) {
@@ -579,13 +618,13 @@ export default class ControlTrigger extends ControlBase {
 		this.#lastSentTriggerJson = newJson
 	}
 
-	commitChange() {
+	commitChange(): void {
 		super.commitChange()
 
 		this.#sendTriggerJsonChange()
 	}
 
-	destroy() {
+	destroy(): void {
 		this.#timerEvents.destroy()
 		this.#miscEvents.destroy()
 		this.#variablesEvents.destroy()
@@ -605,7 +644,7 @@ export default class ControlTrigger extends ControlBase {
 	 * @access protected
 	 */
 	triggerRedraw = debounceFn(
-		() => {
+		(): void => {
 			try {
 				const newStatus = this.feedbacks.checkValueAsBoolean()
 				if (
@@ -639,7 +678,7 @@ export default class ControlTrigger extends ControlBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	eventAdd(eventItem) {
+	eventAdd(eventItem: TriggerEventInstance): boolean {
 		this.events.push(eventItem)
 
 		// Inform relevant module
@@ -656,7 +695,7 @@ export default class ControlTrigger extends ControlBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	eventDuplicate(id) {
+	eventDuplicate(id: string): boolean {
 		const index = this.events.findIndex((fb) => fb.id === id)
 		if (index !== -1) {
 			const eventItem = cloneDeep(this.events[index])
@@ -666,7 +705,7 @@ export default class ControlTrigger extends ControlBase {
 
 			this.#restartEvent(eventItem)
 
-			this.commitChange(false)
+			this.commitChange()
 
 			return true
 		}
@@ -674,7 +713,7 @@ export default class ControlTrigger extends ControlBase {
 		return false
 	}
 
-	eventEnabled(id, enabled) {
+	eventEnabled(id: string, enabled: boolean): boolean {
 		for (const event of this.events) {
 			if (event && event.id === id) {
 				event.enabled = !!enabled
@@ -697,7 +736,7 @@ export default class ControlTrigger extends ControlBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	eventRemove(id) {
+	eventRemove(id: string): boolean {
 		const index = this.events.findIndex((ev) => ev.id === id)
 		if (index !== -1) {
 			const event = this.events[index]
@@ -720,7 +759,7 @@ export default class ControlTrigger extends ControlBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	eventReorder(oldIndex, newIndex) {
+	eventReorder(oldIndex: number, newIndex: number): void {
 		oldIndex = clamp(oldIndex, 0, this.events.length)
 		newIndex = clamp(newIndex, 0, this.events.length)
 		this.events.splice(newIndex, 0, ...this.events.splice(oldIndex, 1))
@@ -736,7 +775,7 @@ export default class ControlTrigger extends ControlBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	eventSetOptions(id, key, value) {
+	eventSetOptions(id: string, key: string, value: any): boolean {
 		for (const event of this.events) {
 			if (event && event.id === id) {
 				if (!event.options) event.options = {}
