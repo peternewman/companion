@@ -15,23 +15,25 @@
  *
  */
 
-import CoreBase from '../Core/Base.js'
 import os from 'os'
 import { exec } from 'child_process'
 import { isEqual } from 'lodash-es'
+import type { ActionInstance, Registry, RunActionExtras, VariableDefinition } from '../tmp.js'
+import { InternalFragment } from './FragmantBase.js'
+import { ActionDefinition } from '../Instance/Definitions.js'
 
 function getNetworkInterfacesVariables() {
 	// TODO - review/refactor this
 
-	const definitions = []
-	const values = {}
+	const definitions: VariableDefinition[] = []
+	const values: Record<string, string> = {}
 	let allIps = ''
 
 	try {
 		const networkInterfaces = os.networkInterfaces()
 		for (const iface in networkInterfaces) {
 			const v4Addresses = []
-			for (const address of networkInterfaces[iface]) {
+			for (const address of networkInterfaces?.[iface] || []) {
 				if (address?.family === 'IPv4') {
 					v4Addresses.push(address.address)
 				}
@@ -59,11 +61,11 @@ function getNetworkInterfacesVariables() {
 	return { definitions, values }
 }
 
-export default class System extends CoreBase {
-	#interfacesDefinitions = []
-	#interfacesValues = {}
+export default class System extends InternalFragment {
+	#interfacesDefinitions: VariableDefinition[] = []
+	#interfacesValues: Record<string, string> = {}
 
-	constructor(registry, internalModule) {
+	constructor(registry: Registry) {
 		super(registry, 'internal', 'Internal/System')
 
 		// this.internalModule = internalModule
@@ -92,7 +94,7 @@ export default class System extends CoreBase {
 		}
 	}
 
-	getVariableDefinitions() {
+	getVariableDefinitions(): VariableDefinition[] {
 		return [
 			{
 				label: 'IP of admin network interface',
@@ -105,8 +107,8 @@ export default class System extends CoreBase {
 		]
 	}
 
-	getActionDefinitions() {
-		const actions = {
+	override getActionDefinitions(): Record<string, ActionDefinition> {
+		const actions: Record<string, ActionDefinition> = {
 			exec: {
 				label: 'Run shell path (local)',
 				options: [
@@ -143,7 +145,7 @@ export default class System extends CoreBase {
 		return actions
 	}
 
-	executeAction(action) {
+	override executeAction(action: ActionInstance, _extras: RunActionExtras): boolean | undefined {
 		if (action.action === 'exec') {
 			if (action.options.path) {
 				const path = this.instance.variable.parseVariables(action.options.path).text
@@ -154,7 +156,7 @@ export default class System extends CoreBase {
 					{
 						timeout: action.options.timeout ?? 5000,
 					},
-					(error, stdout, stderr) => {
+					(error, _stdout, _stderr) => {
 						if (error) {
 							this.logger.error('Shell command failed. Guru meditation: ' + JSON.stringify(error))
 							this.logger.silly(error)
@@ -170,5 +172,6 @@ export default class System extends CoreBase {
 			this.registry.exit(true, true)
 			return true
 		}
+		return undefined
 	}
 }

@@ -17,9 +17,11 @@
 
 import { serializeIsVisibleFn } from '@companion-module/base/dist/internal/base.js'
 import { cloneDeep } from 'lodash-es'
-import CoreBase from '../Core/Base.js'
 import { SplitVariableId, rgb } from '../Resources/Util.js'
 import { CreateBankControlId } from '../Shared/ControlId.js'
+import { ActionInstance, FeedbackInstance, Registry, RunActionExtras } from '../tmp.js'
+import { InternalFragment } from './FragmantBase.js'
+import { ActionDefinition, FeedbackDefinition } from '../Instance/Definitions.js'
 
 const previewControlIdFn = ((options, info) => {
 	// Note: this is manual, but it can't depend on other functions
@@ -93,21 +95,21 @@ const CHOICES_BUTTON_WITH_VARIABLES = serializeIsVisibleFn([
 	},
 ])
 
-export default class Controls extends CoreBase {
-	constructor(registry, internalModule) {
+export default class Controls extends InternalFragment {
+	constructor(registry: Registry) {
 		super(registry, 'internal', 'Internal/Controls')
 
 		// this.internalModule = internalModule
 
 		setImmediate(() => {
-			this.graphics.on('bank_invalidated', (page, bank) => {
+			this.graphics.on('bank_invalidated', (_page: number, _bank: number) => {
 				// TODO - can we make this more specific? This could invalidate a lot of stuff unnecessarily..
 				this.internalModule.checkFeedbacks('bank_style', 'bank_pushed', 'bank_current_step')
 			})
 		})
 	}
 
-	#fetchPageAndButton(options, info, useVariableFields) {
+	#fetchPageAndButton(options: Record<string, any>, info, useVariableFields: boolean) {
 		let thePage = options.page
 		let theButton = options.bank
 
@@ -132,7 +134,7 @@ export default class Controls extends CoreBase {
 		}
 	}
 
-	getActionDefinitions() {
+	override getActionDefinitions(): Record<string, ActionDefinition> {
 		return {
 			button_pressrelease: {
 				label: 'Button: Trigger press and release',
@@ -343,7 +345,7 @@ export default class Controls extends CoreBase {
 		}
 	}
 
-	getFeedbackDefinitions() {
+	override getFeedbackDefinitions(): Record<string, FeedbackDefinition> {
 		return {
 			bank_style: {
 				type: 'advanced',
@@ -397,7 +399,7 @@ export default class Controls extends CoreBase {
 		}
 	}
 
-	executeFeedback(feedback) {
+	override executeFeedback(feedback: FeedbackInstance): boolean | undefined {
 		if (feedback.type === 'bank_style') {
 			const { thePage, theButton, theControlId } = this.#fetchPageAndButton(feedback.options, feedback.info)
 
@@ -442,7 +444,7 @@ export default class Controls extends CoreBase {
 		}
 	}
 
-	executeAction(action, extras) {
+	override executeAction(action: ActionInstance, extras: RunActionExtras): boolean | undefined {
 		if (action.action === 'button_pressrelease') {
 			const { theControlId } = this.#fetchPageAndButton(action.options, extras, true)
 

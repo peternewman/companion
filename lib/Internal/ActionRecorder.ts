@@ -15,12 +15,14 @@
  *
  */
 
-import CoreBase from '../Core/Base.js'
+import { ActionDefinition, FeedbackDefinition } from '../Instance/Definitions.js'
 import { rgb } from '../Resources/Util.js'
 import { CreateBankControlId } from '../Shared/ControlId.js'
+import type { ActionInstance, FeedbackInstance, Registry, RunActionExtras, VariableDefinition } from '../tmp.js'
+import { InternalFragment } from './FragmantBase.js'
 
-export default class ActionRecorder extends CoreBase {
-	constructor(registry, internalModule) {
+export default class ActionRecorder extends InternalFragment {
+	constructor(registry: Registry) {
 		super(registry, 'internal', 'Internal/ActionRecorder')
 
 		// this.internalModule = internalModule
@@ -43,7 +45,7 @@ export default class ActionRecorder extends CoreBase {
 		})
 	}
 
-	getActionDefinitions() {
+	override getActionDefinitions(): Record<string, ActionDefinition> {
 		return {
 			action_recorder_set_recording: {
 				label: 'Action Recorder: Set recording',
@@ -137,7 +139,7 @@ export default class ActionRecorder extends CoreBase {
 		}
 	}
 
-	executeAction(action, extras) {
+	override executeAction(action: ActionInstance, extras: RunActionExtras): boolean | undefined {
 		if (action.action === 'action_recorder_set_recording') {
 			const session = this.registry.controls.actionRecorder.getSession()
 			if (session) {
@@ -195,8 +197,8 @@ export default class ActionRecorder extends CoreBase {
 			let page = Number(pageRaw)
 			let bank = Number(bankRaw)
 			if (!isNaN(page) && !isNaN(bank) && setId && stepId) {
-				if (page === 0) page = extras.page
-				if (bank === 0) bank = extras.bank
+				if (page === 0 && extras.page) page = extras.page
+				if (bank === 0 && extras.bank) bank = extras.bank
 
 				const controlId = CreateBankControlId(page, bank)
 
@@ -217,9 +219,10 @@ export default class ActionRecorder extends CoreBase {
 
 			return true
 		}
+		return undefined
 	}
 
-	getFeedbackDefinitions() {
+	override getFeedbackDefinitions(): Record<string, FeedbackDefinition> {
 		return {
 			action_recorder_check_connections: {
 				type: 'boolean',
@@ -263,7 +266,7 @@ export default class ActionRecorder extends CoreBase {
 		}
 	}
 
-	executeFeedback(feedback) {
+	override executeFeedback(feedback: FeedbackInstance): boolean | undefined {
 		if (feedback.type === 'action_recorder_check_connections') {
 			const session = this.registry.controls.actionRecorder.getSession()
 			if (!session) return false
@@ -291,9 +294,10 @@ export default class ActionRecorder extends CoreBase {
 				return matches
 			}
 		}
+		return undefined
 	}
 
-	getVariableDefinitions() {
+	override getVariableDefinitions(): VariableDefinition[] {
 		return [
 			{
 				label: 'Actions Recorder: Action count',

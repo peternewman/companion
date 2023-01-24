@@ -15,10 +15,13 @@
  *
  */
 
-import CoreBase from '../Core/Base.js'
+import type { Registry, VariableDefinition } from '../tmp.js'
+import { InternalFragment } from './FragmantBase.js'
 
-export default class Time extends CoreBase {
-	constructor(registry, internalModule) {
+export default class Time extends InternalFragment {
+	time_interval: NodeJS.Timer
+
+	constructor(registry: Registry) {
 		super(registry, 'internal', 'Internal/Time')
 
 		// this.internalModule = internalModule
@@ -28,7 +31,7 @@ export default class Time extends CoreBase {
 		}, 500) // Do it at 2hz to make sure we dont skip one
 	}
 
-	getVariableDefinitions() {
+	getVariableDefinitions(): VariableDefinition[] {
 		return [
 			{
 				label: 'Date (Year)',
@@ -65,7 +68,7 @@ export default class Time extends CoreBase {
 		]
 	}
 
-	updateVariables() {
+	updateVariables(): void {
 		const now = new Date()
 		const hh = `0${now.getHours()}`.slice(-2)
 		const mm = `0${now.getMinutes()}`.slice(-2)

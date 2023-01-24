@@ -15,12 +15,14 @@
  *
  */
 
-import CoreBase from '../Core/Base.js'
+import { ActionDefinition, FeedbackDefinition } from '../Instance/Definitions.js'
 import { rgb } from '../Resources/Util.js'
 import { ParseControlId } from '../Shared/ControlId.js'
+import type { ActionInstance, FeedbackInstance, Registry, RunActionExtras } from '../tmp.js'
+import { InternalFragment } from './FragmantBase.js'
 
-export default class Triggers extends CoreBase {
-	constructor(registry, internalModule) {
+export default class Triggers extends InternalFragment {
+	constructor(registry: Registry) {
 		super(registry, 'internal', 'Internal/Triggers')
 
 		// this.internalModule = internalModule
@@ -30,7 +32,7 @@ export default class Triggers extends CoreBase {
 		})
 	}
 
-	getActionDefinitions() {
+	override getActionDefinitions(): Record<string, ActionDefinition> {
 		return {
 			trigger_enabled: {
 				label: 'Enable or disable trigger',
@@ -56,7 +58,7 @@ export default class Triggers extends CoreBase {
 		}
 	}
 
-	executeAction(action) {
+	override executeAction(action: ActionInstance, _extras: RunActionExtras): boolean | undefined {
 		if (action.action === 'trigger_enabled') {
 			const parsedControlId = ParseControlId(action.options.trigger_id)
 			if (parsedControlId?.type === 'trigger') {
@@ -71,9 +73,10 @@ export default class Triggers extends CoreBase {
 
 			return true
 		}
+		return undefined
 	}
 
-	getFeedbackDefinitions() {
+	override getFeedbackDefinitions(): Record<string, FeedbackDefinition> {
 		return {
 			trigger_enabled: {
 				type: 'boolean',
@@ -103,7 +106,7 @@ export default class Triggers extends CoreBase {
 		}
 	}
 
-	executeFeedback(feedback) {
+	override executeFeedback(feedback: FeedbackInstance): boolean | undefined {
 		if (feedback.type === 'trigger_enabled') {
 			const parsedControlId = ParseControlId(feedback.options.trigger_id)
 			if (parsedControlId?.type === 'trigger') {
@@ -117,5 +120,6 @@ export default class Triggers extends CoreBase {
 				return false
 			}
 		}
+		return undefined
 	}
 }

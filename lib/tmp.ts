@@ -2,6 +2,7 @@ import { CompanionAlignment, CompanionFeedbackButtonStyleResult } from '@compani
 import { Server, Socket } from 'socket.io'
 import { EventsMap, ReservedOrUserEventNames, ReservedOrUserListener } from 'socket.io/dist/typed-events'
 import type LogController from './Log/Controller'
+import type ControlsController from './Controls/Controller'
 
 /**
  * Make all optional properties be required and `| undefined`
@@ -23,6 +24,8 @@ export interface Registry {
 	io: SocketServerExt
 
 	log: typeof LogController
+
+	controls: ControlsController
 }
 
 export interface SocketClient<

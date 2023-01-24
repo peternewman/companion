@@ -16,17 +16,19 @@
  */
 
 import { JSONPath } from 'jsonpath-plus'
-import CoreBase from '../Core/Base.js'
 import { SplitVariableId } from '../Resources/Util.js'
+import type { ActionInstance, Registry, RunActionExtras } from '../tmp.js'
+import { InternalFragment } from './FragmantBase.js'
+import { ActionDefinition } from '../Instance/Definitions.js'
 
-export default class CustomVariables extends CoreBase {
-	constructor(registry, internalModule) {
+export default class CustomVariables extends InternalFragment {
+	constructor(registry: Registry) {
 		super(registry, 'internal', 'Internal/CustomVariables')
 
 		// this.internalModule = internalModule
 	}
 
-	getActionDefinitions() {
+	override getActionDefinitions(): Record<string, ActionDefinition> {
 		return {
 			custom_variable_set_value: {
 				label: 'Set custom variable to value',
@@ -244,7 +246,7 @@ export default class CustomVariables extends CoreBase {
 		}
 	}
 
-	executeAction(action, extras) {
+	override executeAction(action: ActionInstance, _extras: RunActionExtras): boolean | undefined {
 		if (action.action === 'custom_variable_set_value') {
 			this.instance.variable.custom.setValue(action.options.name, action.options.value)
 			return true

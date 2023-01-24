@@ -17,7 +17,9 @@
 
 import { combineRgb } from '@companion-module/base'
 import { serializeIsVisibleFn } from '@companion-module/base/dist/internal/base.js'
-import CoreBase from '../Core/Base.js'
+import { InternalFragment } from './FragmantBase.js'
+import type { ActionInstance, FeedbackInstance, Registry, RunActionExtras, VariableDefinition } from '../tmp.js'
+import { ActionDefinition, FeedbackDefinition } from '../Instance/Definitions.js'
 
 const CHOICES_CONTROLLER = {
 	type: 'internal:surface_serial',
@@ -73,11 +75,11 @@ const CHOICES_PAGE_WITH_VARIABLES = serializeIsVisibleFn([
 	},
 ])
 
-export default class Surface extends CoreBase {
+export default class Surface extends InternalFragment {
 	/** Page history for surfaces */
 	#pageHistory = new Map()
 
-	constructor(registry, internalModule) {
+	constructor(registry: Registry) {
 		super(registry, 'internal', 'Internal/Surface')
 
 		// this.internalModule = internalModule
@@ -95,7 +97,7 @@ export default class Surface extends CoreBase {
 		})
 	}
 
-	#fetchControllerId(options, info, useVariableFields) {
+	#fetchControllerId(options: Record<string, any>, info, useVariableFields: boolean) {
 		let theController = options.controller
 
 		if (useVariableFields && options.controller_from_variable) {
@@ -109,7 +111,7 @@ export default class Surface extends CoreBase {
 		return theController
 	}
 
-	#fetchPage(options, info, useVariableFields) {
+	#fetchPage(options: Record<string, any>, info, useVariableFields: boolean) {
 		let thePage = options.page
 
 		if (useVariableFields && options.page_from_variable) {
@@ -123,7 +125,7 @@ export default class Surface extends CoreBase {
 		return thePage
 	}
 
-	getVariableDefinitions() {
+	getVariableDefinitions(): VariableDefinition[] {
 		return [
 			{
 				label: 'XKeys: T-bar position',
@@ -140,7 +142,7 @@ export default class Surface extends CoreBase {
 		]
 	}
 
-	actionUpgrade(action, controlId) {
+	actionUpgrade(action: ActionInstance, _controlId: string): ActionInstance | undefined {
 		// Upgrade an action. This check is not the safest, but it should be ok
 		if (action.options.controller === 'emulator') {
 			// Hope that the default emulator still exists
@@ -148,9 +150,10 @@ export default class Surface extends CoreBase {
 
 			return action
 		}
+		return undefined
 	}
 
-	getActionDefinitions() {
+	override getActionDefinitions(): Record<string, ActionDefinition> {
 		return {
 			set_brightness: {
 				label: 'Set surface with serialnumber to brightness',
@@ -225,7 +228,7 @@ export default class Surface extends CoreBase {
 		}
 	}
 
-	executeAction(action, extras) {
+	override executeAction(action: ActionInstance, extras: RunActionExtras): boolean | undefined {
 		if (action.action === 'set_brightness') {
 			const theController = this.#fetchControllerId(action.options, extras, true)
 
@@ -318,9 +321,10 @@ export default class Surface extends CoreBase {
 			})
 			return true
 		}
+		return undefined
 	}
 
-	#changeSurfacePage(surfaceId, toPage) {
+	#changeSurfacePage(surfaceId: string, toPage: number | 'back' | 'forward' | '+1' | '-1') {
 		const currentPage = this.surfaces.devicePageGet(surfaceId, true)
 		if (currentPage === undefined) {
 			// Bad surfaceId
@@ -385,7 +389,7 @@ export default class Surface extends CoreBase {
 		}
 	}
 
-	getFeedbackDefinitions() {
+	override getFeedbackDefinitions(): Record<string, FeedbackDefinition> {
 		return {
 			surface_on_page: {
 				type: 'boolean',
@@ -413,7 +417,7 @@ export default class Surface extends CoreBase {
 		}
 	}
 
-	executeFeedback(feedback) {
+	override executeFeedback(feedback: FeedbackInstance): boolean | undefined {
 		if (feedback.type == 'surface_on_page') {
 			const theController = this.#fetchControllerId(feedback.options, feedback.info, false)
 			const thePage = this.#fetchPage(feedback.options, feedback.info, false)
@@ -422,5 +426,6 @@ export default class Surface extends CoreBase {
 
 			return currentPage == thePage
 		}
+		return undefined
 	}
 }

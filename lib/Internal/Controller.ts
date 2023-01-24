@@ -27,11 +27,15 @@ import Triggers from './Triggers.js'
 import Variables from './Variables.js'
 import { cloneDeep } from 'lodash-es'
 import { ParseControlId } from '../Shared/ControlId.js'
+import type { ActionInstance, Registry, RunActionExtras } from '../tmp.js'
+import type { InternalFragment } from './FragmantBase.js'
 
 export default class InternalController extends CoreBase {
 	feedbacks = new Map()
 
-	constructor(registry) {
+	fragments: InternalFragment[]
+
+	constructor(registry: Registry) {
 		super(registry, 'internal', 'Internal/Controller')
 
 		this.fragments = [
@@ -94,7 +98,7 @@ export default class InternalController extends CoreBase {
 	 * @param {object} action
 	 * @param {*} controlId
 	 */
-	actionUpgrade(action, controlId) {
+	actionUpgrade(action, controlId: string) {
 		for (const fragment of this.fragments) {
 			if (typeof fragment.actionUpgrade === 'function') {
 				try {
@@ -118,7 +122,7 @@ export default class InternalController extends CoreBase {
 	// 		//
 	// 	}
 
-	feedbackUpdate(feedback, controlId) {
+	feedbackUpdate(feedback, controlId: string) {
 		if (feedback.instance_id !== 'internal') throw new Error(`Feedback is not for internal instance`)
 		if (feedback.disabled) return
 
@@ -169,7 +173,7 @@ export default class InternalController extends CoreBase {
 		return undefined
 	}
 
-	executeAction(action, extras) {
+	executeAction(action: ActionInstance, extras: RunActionExtras): boolean | undefined {
 		for (const fragment of this.fragments) {
 			if (typeof fragment.executeAction === 'function') {
 				try {
@@ -193,7 +197,7 @@ export default class InternalController extends CoreBase {
 	setVariables(variables) {
 		this.registry.instance.variable.setVariableValues('internal', variables)
 	}
-	checkFeedbacks(...types) {
+	checkFeedbacks(...types: string[]) {
 		const typesSet = new Set(types)
 
 		const newValues = []
@@ -210,7 +214,7 @@ export default class InternalController extends CoreBase {
 
 		this.registry.controls.updateFeedbackValues('internal', newValues)
 	}
-	checkFeedbacksById(...ids) {
+	checkFeedbacksById(...ids: string[]) {
 		const newValues = []
 
 		for (const id of ids) {
@@ -275,7 +279,7 @@ export default class InternalController extends CoreBase {
 		}
 	}
 	// HACK - Can we avoid having everything make calls into this or its children?
-	variablesChanged(changed_variables, removed_variables) {
+	variablesChanged(changed_variables: Record<string, any>, removed_variables: string[]): void {
 		for (const fragment of this.fragments) {
 			if (typeof fragment.variablesChanged === 'function') {
 				fragment.variablesChanged(changed_variables, removed_variables)

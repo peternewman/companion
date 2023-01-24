@@ -16,11 +16,12 @@
  */
 
 import { combineRgb } from '@companion-module/base'
-import CoreBase from '../Core/Base.js'
 import { rgb } from '../Resources/Util.js'
+import { InternalFragment } from './FragmantBase.js'
+import type { Registry } from '../tmp.js'
 
-export default class Instance extends CoreBase {
-	constructor(registry, internalModule) {
+export default class Instance extends InternalFragment {
+	constructor(registry: Registry) {
 		super(registry, 'internal', 'Internal/Instance')
 
 		// this.internalModule = internalModule
@@ -31,7 +32,7 @@ export default class Instance extends CoreBase {
 		this.instance_oks = 0
 	}
 
-	getVariableDefinitions() {
+	getVariableDefinitions(): VariableDefinition[] {
 		return [
 			{
 				label: 'Instances with errors',
@@ -48,7 +49,7 @@ export default class Instance extends CoreBase {
 		]
 	}
 
-	getActionDefinitions() {
+	override getActionDefinitions(): Record<string, ActionDefinition> {
 		return {
 			instance_control: {
 				label: 'Enable or disable connection',
@@ -73,7 +74,7 @@ export default class Instance extends CoreBase {
 		}
 	}
 
-	getFeedbackDefinitions() {
+	override getFeedbackDefinitions(): Record<string, FeedbackDefinition> {
 		return {
 			instance_status: {
 				type: 'advanced',
@@ -170,14 +171,14 @@ export default class Instance extends CoreBase {
 		}
 	}
 
-	executeAction(action) {
+	override executeAction(action: ActionInstance, extras: RunActionExtras): boolean | undefined {
 		if (action.action === 'instance_control') {
 			this.registry.instance.enableDisableInstance(action.options.instance_id, action.options.enable == 'true')
 			return true
 		}
 	}
 
-	executeFeedback(feedback) {
+	override executeFeedback(feedback: FeedbackInstance): boolean | undefined {
 		if (feedback.type === 'instance_status') {
 			if (feedback.options.instance_id == 'all') {
 				if (this.instance_errors > 0) {
@@ -237,7 +238,7 @@ export default class Instance extends CoreBase {
 		}
 	}
 
-	updateVariables() {
+	updateVariables(): void {
 		this.internalModule.setVariables({
 			instance_errors: this.instance_errors,
 			instance_warns: this.instance_warns,
@@ -245,7 +246,7 @@ export default class Instance extends CoreBase {
 		})
 	}
 
-	calculateInstanceErrors(instance_statuses) {
+	calculateInstanceErrors(instance_statuses): void {
 		let numError = 0
 		let numWarn = 0
 		let numOk = 0

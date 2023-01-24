@@ -15,8 +15,10 @@
  *
  */
 
-import CoreBase from '../Core/Base.js'
-import { SplitVariableId, rgb } from '../Resources/Util.js'
+import { FeedbackDefinition } from '../Instance/Definitions.js'
+import { rgb } from '../Resources/Util.js'
+import type { FeedbackInstance, Registry } from '../tmp.js'
+import { InternalFragment } from './FragmantBase.js'
 
 const COMPARISON_OPERATION = {
 	type: 'dropdown',
@@ -31,7 +33,7 @@ const COMPARISON_OPERATION = {
 	],
 }
 
-function compareValues(op, value, value2) {
+function compareValues(op: string, value: any, value2: any) {
 	switch (op) {
 		case 'gt':
 			return value > parseFloat(value2)
@@ -44,16 +46,16 @@ function compareValues(op, value, value2) {
 	}
 }
 
-export default class Variables extends CoreBase {
+export default class Variables extends InternalFragment {
 	// Subscriptions arent supported in this model for now..
 	// #subscriptions = {}
-	constructor(registry, internalModule) {
+	constructor(registry: Registry) {
 		super(registry, 'internal', 'Internal/Variables')
 
 		// this.internalModule = internalModule
 	}
 
-	getFeedbackDefinitions() {
+	override getFeedbackDefinitions(): Record<string, FeedbackDefinition> {
 		return {
 			variable_value: {
 				type: 'boolean',
@@ -153,7 +155,7 @@ export default class Variables extends CoreBase {
 		}
 	}
 
-	executeFeedback(feedback) {
+	override executeFeedback(feedback: FeedbackInstance): boolean | undefined {
 		if (feedback.type == 'variable_value') {
 			const value = this.instance.variable.parseVariables(`$(${feedback.options.variable})`).text
 
@@ -174,9 +176,10 @@ export default class Variables extends CoreBase {
 				return false
 			}
 		}
+		return undefined
 	}
 
-	variablesChanged(changed_variables, removed_variables) {
+	variablesChanged(_changed_variables: Record<string, any>, _removed_variables: string[]) {
 		// const all_changed_variables = new Set([...removed_variables, ...Object.keys(changed_variables)])
 
 		// const affected_ids = []

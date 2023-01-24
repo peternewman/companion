@@ -13,7 +13,6 @@ import {
 	CompanionButtonPresetDefinition as ModulePresetDefinition,
 } from '@companion-module/base'
 import ControlButtonNormal, { ButtonConfig } from '../Controls/ControlTypes/Button/Normal.js'
-import ButtonControlBase from '../Controls/ControlTypes/Button/Base.js'
 
 const PresetsRoom = 'presets'
 const ActionsRoom = 'action-definitions'
@@ -24,12 +23,16 @@ export interface FeedbackDefinition {
 	description?: string
 	options: Array<unknown>
 	type: string
-	style: unknown
+	style?: unknown
+
+	previewControlIdFn?: string
 }
 export interface ActionDefinition {
 	label: string
 	description?: string
 	options: Array<unknown>
+
+	previewControlIdFn?: string
 }
 export interface ButtonPresetDefinition {
 	id: string
