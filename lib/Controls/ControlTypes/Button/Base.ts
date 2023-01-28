@@ -325,7 +325,7 @@ export default abstract class ButtonControlBase<TConfigJson, TRuntimeJson, TOpti
 	 * @param {string} tolabel - the new instance short name
 	 * @access public
 	 */
-	renameVariables(labelFrom: string, labelTo: string) {
+	renameVariables(labelFrom: string, labelTo: string): void {
 		if (this.feedbacks.baseStyle?.text) {
 			const result = this.instance.variable.renameVariablesInString(this.feedbacks.baseStyle.text, labelFrom, labelTo)
 			if (this.feedbacks.baseStyle.text !== result) {

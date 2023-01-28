@@ -1,14 +1,16 @@
 import LogController, { ChildLogger } from '../Log/Controller.js'
-import { CreateBankControlId, ParseControlId } from '../Shared/ControlId.js'
+import { ParseControlId } from '../Shared/ControlId.js'
 import { IpcWrapper } from '@companion-module/base/dist/host-api/ipc-wrapper.js'
 import { ConnectionDebugLogRoom } from './Host.js'
 import type {
+	EncodeIsVisible,
 	HostToModuleEventsV0,
 	LogMessageMessage,
 	ModuleToHostEventsV0,
 	ParseVariablesInStringMessage,
 	ParseVariablesInStringResponseMessage,
 	RecordActionMessage,
+	SaveConfigMessage,
 	SendOscMessage,
 	SetActionDefinitionsMessage,
 	SetCustomVariableMessage,
@@ -22,15 +24,41 @@ import type {
 	UpdateFeedbackValuesMessage,
 	UpgradedDataResponseMessage,
 } from '@companion-module/base/dist/host-api/api.js'
-import type { ActionInstance, Complete, FeedbackInstance, Registry } from '../tmp.js'
+import type { ActionInstance, Complete, FeedbackInstance, Registry, RunActionExtras } from '../tmp.js'
 import type { ActionDefinition, ButtonPresetDefinition, FeedbackDefinition } from './Definitions.js'
-import type { CompanionVariableValues } from '@companion-module/base'
+import {
+	assertNever,
+	CompanionAdvancedFeedbackResult,
+	CompanionHTTPRequest,
+	CompanionInputFieldCheckbox,
+	CompanionInputFieldColor,
+	CompanionInputFieldCustomVariable,
+	CompanionInputFieldDropdown,
+	CompanionInputFieldMultiDropdown,
+	CompanionInputFieldNumber,
+	CompanionInputFieldStaticText,
+	CompanionInputFieldTextInput,
+	CompanionVariableValues,
+} from '@companion-module/base'
 import type {
 	FeedbackInstance as ModuleFeedbackInstance,
 	ActionInstance as ModuleActionInstance,
 } from '@companion-module/base/dist/host-api/api.js'
 import type { SomeUIInputField } from '../Shared/InputFields.js'
 import InstanceStatuses from './Status'
+import {
+	ReceiveInputFieldCheckbox,
+	ReceiveInputFieldColor,
+	ReceiveInputFieldCustomVariable,
+	ReceiveInputFieldDropdown,
+	ReceiveInputFieldMultiDropdown,
+	ReceiveInputFieldNumber,
+	ReceiveInputFieldStaticText,
+	ReceiveInputFieldTextInput,
+} from './Convert.js'
+import FragmentFeedbacks from '../Controls/Fragments/FragmentFeedbacks.js'
+import FragmentActions from '../Controls/Fragments/FragmentActions.js'
+import { Request, Response } from 'express'
 
 class SocketEventsHandler {
 	registry: Registry
@@ -125,7 +153,7 @@ class SocketEventsHandler {
 	 * Forward an updated config object to the instance class
 	 * @param {object} config
 	 */
-	async updateConfig(config) {
+	async updateConfig(config: unknown) {
 		await this.ipcWrapper.sendWithCb('updateConfig', config)
 	}
 
@@ -145,7 +173,45 @@ class SocketEventsHandler {
 	async requestConfigFields(): Promise<SomeUIInputField[]> {
 		try {
 			const res = await this.ipcWrapper.sendWithCb('getConfigFields', {})
-			return res.fields
+			return res.fields.map((field) => {
+				switch (field.type) {
+					case 'number':
+						return ReceiveInputFieldNumber(
+							field as EncodeIsVisible<CompanionInputFieldNumber> & { width?: number },
+							true
+						)
+					case 'static-text':
+						return ReceiveInputFieldStaticText(
+							field as EncodeIsVisible<CompanionInputFieldStaticText> & { width?: number },
+							true
+						)
+					case 'colorpicker':
+						return ReceiveInputFieldColor(field as EncodeIsVisible<CompanionInputFieldColor> & { width?: number }, true)
+					case 'textinput':
+						return ReceiveInputFieldTextInput(
+							field as EncodeIsVisible<CompanionInputFieldTextInput> & { width?: number },
+							true
+						)
+					case 'dropdown':
+						return ReceiveInputFieldDropdown(
+							field as EncodeIsVisible<CompanionInputFieldDropdown> & { width?: number },
+							true
+						)
+					case 'multidropdown':
+						return ReceiveInputFieldMultiDropdown(
+							field as EncodeIsVisible<CompanionInputFieldMultiDropdown> & { width?: number },
+							true
+						)
+					case 'checkbox':
+						return ReceiveInputFieldCheckbox(
+							field as EncodeIsVisible<CompanionInputFieldCheckbox> & { width?: number },
+							true
+						)
+					default:
+						assertNever(field.type)
+						return undefined as any
+				}
+			})
 		} catch (e: any) {
 			this.logger.warn('Error getting config fields: ' + e?.message)
 			throw e
@@ -182,7 +248,7 @@ class SocketEventsHandler {
 							bank: parsed.bank,
 
 							// Pass the current default style for compatability reasons
-							rawBank: control.config,
+							rawBank: control.style,
 						}
 					}
 				}
@@ -227,7 +293,7 @@ class SocketEventsHandler {
 
 		const allControls = this.registry.controls.getAllControls()
 		for (const [controlId, control] of Object.entries(allControls)) {
-			if (typeof control.getAllActions === 'function') {
+			if (control && typeof control.getAllActions === 'function') {
 				const actions = control.getAllActions()
 
 				for (const action of actions) {
@@ -239,11 +305,11 @@ class SocketEventsHandler {
 							actionId: action.action,
 							options: action.options,
 
-							upgradeIndex: action.upgradeIndex,
-							disabled: action.disabled,
+							upgradeIndex: action.upgradeIndex ?? null,
+							disabled: !!action.disabled,
 
-							page: parsed?.page,
-							bank: parsed?.bank,
+							page: parsed?.type === 'bank' ? parsed.page : null,
+							bank: parsed?.type === 'bank' ? parsed.bank : null,
 						}
 					}
 				}
@@ -257,7 +323,7 @@ class SocketEventsHandler {
 	 * Send all action instances to the child process
 	 * @access private
 	 */
-	async #sendAllActionInstances() {
+	async #sendAllActionInstances(): Promise<void> {
 		const msg: UpdateActionInstancesMessage = {
 			actions: this.#getAllActionInstances(),
 		}
@@ -294,7 +360,7 @@ class SocketEventsHandler {
 					disabled: !!feedback.disabled,
 
 					// Pass the current default style for compatability reasons
-					rawBank: control?.config,
+					rawBank: control?.style,
 				} satisfies Complete<ModuleFeedbackInstance>,
 			},
 		})
@@ -305,13 +371,33 @@ class SocketEventsHandler {
 		controlId: string
 	): Promise<FeedbackInstance['options'] | undefined> {
 		try {
+			const parsedId = ParseControlId(controlId)
+
+			const control = this.registry.controls.getControl(controlId)
+
 			const msg = await this.ipcWrapper.sendWithCb('learnFeedback', {
-				feedback,
+				feedback: {
+					id: feedback.id,
+					controlId: controlId,
+					feedbackId: feedback.type,
+					options: feedback.options,
+
+					image: control?.getBitmapSize() ?? undefined,
+					page: parsedId?.type === 'bank' ? parsedId.page : 0,
+					bank: parsedId?.type === 'bank' ? parsedId.bank : 0,
+
+					upgradeIndex: null,
+					disabled: !!feedback.disabled,
+
+					// Pass the current default style for compatability reasons
+					rawBank: control?.style,
+				} satisfies Complete<ModuleFeedbackInstance>,
 			})
 
 			return msg.options
 		} catch (e: any) {
 			this.logger.warn('Error learning feedback options: ' + e?.message)
+			return undefined
 		}
 	}
 
@@ -352,8 +438,8 @@ class SocketEventsHandler {
 					upgradeIndex: null,
 					disabled: !!action.disabled,
 
-					page: parsedId?.type === 'bank' ? parsedId.page : 0,
-					bank: parsedId?.type === 'bank' ? parsedId.bank : 0,
+					page: parsedId?.type === 'bank' ? parsedId.page : null,
+					bank: parsedId?.type === 'bank' ? parsedId.bank : null,
 				} satisfies Complete<ModuleActionInstance>,
 			},
 		})
@@ -375,39 +461,56 @@ class SocketEventsHandler {
 
 	async actionLearnValues(action: ActionInstance, controlId: string): Promise<ActionInstance['options'] | undefined> {
 		try {
+			const parsed = ParseControlId(controlId)
+
 			const msg = await this.ipcWrapper.sendWithCb('learnAction', {
-				action,
+				action: {
+					id: action.id,
+					controlId: controlId, // A temporary identifier
+					actionId: action.action,
+					options: action.options,
+
+					upgradeIndex: null,
+					disabled: !!action.disabled,
+
+					page: parsed?.type === 'bank' ? parsed.page : null,
+					bank: parsed?.type === 'bank' ? parsed.bank : null,
+				} satisfies Complete<ModuleActionInstance>,
 			})
 
 			return msg.options
 		} catch (e: any) {
 			this.logger.warn('Error learning action options: ' + e?.message)
+			return undefined
 		}
 	}
 
 	/**
 	 * Tell the child instance class to execute an action
-	 * @param {object} action
-	 * @param {object} extras
+	 * @param action
+	 * @param extras
 	 */
-	async actionRun(action: ActionInstance, extras): Promise<void> {
+	async actionRun(action: ActionInstance, controlId: string, extras: RunActionExtras): Promise<void> {
 		if (action.instance !== this.connectionId) throw new Error(`Action is for a diferent instance`)
 
 		try {
 			await this.ipcWrapper.sendWithCb('executeAction', {
 				action: {
 					id: action.id,
-					controlId: CreateBankControlId(extras?.page, extras?.bank), // A temporary identifier
+					controlId: controlId,
 					actionId: action.action,
 					options: action.options,
 
-					page: extras?.page ?? 0,
-					bank: extras?.bank ?? 0,
+					upgradeIndex: null,
+					disabled: !!action.disabled,
+
+					page: extras?.page ?? null,
+					bank: extras?.bank ?? null,
 				} satisfies Complete<ModuleActionInstance>,
 
 				deviceId: extras?.deviceid,
 			})
-		} catch (e) {
+		} catch (e: any) {
 			this.logger.warn(`Error executing action: ${e.message ?? e}`)
 
 			throw e
@@ -433,33 +536,24 @@ class SocketEventsHandler {
 		// Future: for use in refactoring
 	}
 
-	executeHttpRequest(req, res) {
+	executeHttpRequest(req: Request, res: Response) {
 		if (this.hasHttpHandler) {
-			const requestData = {
+			const requestData: CompanionHTTPRequest = {
 				baseUrl: req.baseUrl,
 				body: req.body,
-				headers: req.headers,
+				headers: req.headers as any,
 				hostname: req.hostname,
 				ip: req.ip,
 				method: req.method,
 				originalUrl: req.originalUrl,
 				path: req.path,
-				query: req.query,
+				query: req.query as any,
 			}
 
-			const defaultResponse = () => ({
-				status: 504,
-				body: JSON.stringify({ status: 504, message: 'Gateway Timeout' }),
-			})
-
 			this.ipcWrapper
-				.sendWithCb(
-					'handleHttpRequest',
-					{
-						request: requestData,
-					},
-					defaultResponse
-				)
+				.sendWithCb('handleHttpRequest', {
+					request: requestData,
+				})
 				.then((msg) => {
 					const data = {
 						status: 200,
@@ -472,8 +566,12 @@ class SocketEventsHandler {
 					res.set(data.headers)
 					res.send(data.body)
 				})
-				.catch((_err) => {
-					res.status(500).send(JSON.stringify({ status: 500, message: 'Internal Server Error' }))
+				.catch((err: any) => {
+					if (err instanceof Error && err.message.includes('timed out')) {
+						res.status(504).send(JSON.stringify({ status: 504, message: 'Gateway Timeout' }))
+					} else {
+						res.status(500).send(JSON.stringify({ status: 500, message: 'Internal Server Error' }))
+					}
 				})
 		} else {
 			res.status(404).send(JSON.stringify({ status: 404, message: 'Not Found' }))
@@ -512,7 +610,29 @@ class SocketEventsHandler {
 			actions[rawAction.id] = {
 				label: rawAction.name,
 				description: rawAction.description,
-				options: rawAction.options || [],
+				options: (rawAction.options || []).map((field) => {
+					switch (field.type) {
+						case 'number':
+							return ReceiveInputFieldNumber(field as EncodeIsVisible<CompanionInputFieldNumber>, false)
+						case 'static-text':
+							return ReceiveInputFieldStaticText(field as EncodeIsVisible<CompanionInputFieldStaticText>, false)
+						case 'colorpicker':
+							return ReceiveInputFieldColor(field as EncodeIsVisible<CompanionInputFieldColor>, false)
+						case 'textinput':
+							return ReceiveInputFieldTextInput(field as EncodeIsVisible<CompanionInputFieldTextInput>, false)
+						case 'dropdown':
+							return ReceiveInputFieldDropdown(field as EncodeIsVisible<CompanionInputFieldDropdown>, false)
+						case 'multidropdown':
+							return ReceiveInputFieldMultiDropdown(field as EncodeIsVisible<CompanionInputFieldMultiDropdown>, false)
+						case 'checkbox':
+							return ReceiveInputFieldCheckbox(field as EncodeIsVisible<CompanionInputFieldCheckbox>, false)
+						case 'custom-variable':
+							return ReceiveInputFieldCustomVariable(field as EncodeIsVisible<CompanionInputFieldCustomVariable>, false)
+						default:
+							assertNever(field.type)
+							return null as any
+					}
+				}),
 			}
 		}
 
@@ -529,7 +649,27 @@ class SocketEventsHandler {
 			feedbacks[rawFeedback.id] = {
 				label: rawFeedback.name,
 				description: rawFeedback.description,
-				options: rawFeedback.options || [],
+				options: (rawFeedback.options || []).map((field) => {
+					switch (field.type) {
+						case 'number':
+							return ReceiveInputFieldNumber(field as EncodeIsVisible<CompanionInputFieldNumber>, false)
+						case 'static-text':
+							return ReceiveInputFieldStaticText(field as EncodeIsVisible<CompanionInputFieldStaticText>, false)
+						case 'colorpicker':
+							return ReceiveInputFieldColor(field as EncodeIsVisible<CompanionInputFieldColor>, false)
+						case 'textinput':
+							return ReceiveInputFieldTextInput(field as EncodeIsVisible<CompanionInputFieldTextInput>, false)
+						case 'dropdown':
+							return ReceiveInputFieldDropdown(field as EncodeIsVisible<CompanionInputFieldDropdown>, false)
+						case 'multidropdown':
+							return ReceiveInputFieldMultiDropdown(field as EncodeIsVisible<CompanionInputFieldMultiDropdown>, false)
+						case 'checkbox':
+							return ReceiveInputFieldCheckbox(field as EncodeIsVisible<CompanionInputFieldCheckbox>, false)
+						default:
+							assertNever(field.type)
+							return null as any
+					}
+				}),
 				type: rawFeedback.type,
 				style: rawFeedback.defaultStyle,
 			}
@@ -609,7 +749,7 @@ class SocketEventsHandler {
 	/**
 	 * Handle saving an updated config object from the child process
 	 */
-	async #handleSaveConfig(msg) {
+	async #handleSaveConfig(msg: SaveConfigMessage) {
 		// Save config, but do not automatically call this module's updateConfig again
 		this.registry.instance.setInstanceLabelAndConfig(this.connectionId, null, msg.config, true)
 	}
@@ -675,7 +815,13 @@ class SocketEventsHandler {
 			for (const feedback of Object.values(msg.updatedFeedbacks)) {
 				if (feedback) {
 					const control = this.registry.controls.getControl(feedback.controlId)
-					const found = control?.feedbacks?.feedbackReplace?.(feedback) ?? false
+					const found = control?.feedbacks?.feedbackReplace?.({
+						id: feedback.id,
+						type: feedback.feedbackId,
+						options: feedback.options,
+						style: feedback.style,
+					} satisfies Complete<Parameters<FragmentFeedbacks<CompanionAdvancedFeedbackResult>['feedbackReplace']>[0]>)
+
 					if (!found) {
 						this.logger.silly(`Failed to replace upgraded feedback: ${feedback.id} ${feedback.controlId}`)
 					}
@@ -685,7 +831,12 @@ class SocketEventsHandler {
 			for (const action of Object.values(msg.updatedActions)) {
 				if (action) {
 					const control = this.registry.controls.getControl(action.controlId)
-					const found = control?.actionReplace?.(action) ?? false
+					const found = control?.actionReplace?.({
+						id: action.id,
+						action: action.actionId,
+						options: action.options,
+					} satisfies Complete<Parameters<FragmentActions['actionReplace']>[0]>)
+
 					if (!found) {
 						this.logger.silly(`Failed to replace upgraded action: ${action.id} ${action.controlId}`)
 					}

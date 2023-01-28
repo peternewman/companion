@@ -111,13 +111,13 @@ export default class ActionRunner extends CoreBase {
 	 * @param {*} extras
 	 * @access private
 	 */
-	#runAction(action: ActionInstance, extras: RunActionExtras): void {
+	#runAction(action: ActionInstance, controlId: string, extras: RunActionExtras): void {
 		if (action.instance === 'internal') {
 			this.internalModule.executeAction(action, extras)
 		} else {
 			const instance = this.instance.moduleHost.getChild(action.instance)
 			if (instance) {
-				instance.actionRun(action, extras).catch((e: any) => {
+				instance.actionRun(action, controlId, extras).catch((e: any) => {
 					this.logger.silly(`Error executing action for ${instance.connectionId}: ${e.message ?? e}`)
 				})
 			} else {
@@ -200,7 +200,7 @@ export default class ActionRunner extends CoreBase {
 			if (delay_time > 0) {
 				has_delayed = true
 				const timer = setTimeout(() => {
-					this.#runAction(action, extra2)
+					this.#runAction(action, controlId, extra2)
 
 					this.#timers_running.delete(timer)
 
@@ -216,7 +216,7 @@ export default class ActionRunner extends CoreBase {
 
 			// or is it immediate
 			else {
-				this.#runAction(action, extra2)
+				this.#runAction(action, controlId, extra2)
 			}
 		}
 

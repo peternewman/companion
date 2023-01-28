@@ -1,6 +1,7 @@
 import { CompanionOptionValues, DropdownChoice, DropdownChoiceId } from '@companion-module/base'
 
 export type SomeUIInputField =
+	| UIInputFieldStaticText
 	| UIInputFieldTextInput
 	| UIInputFieldCheckbox
 	| UIInputFieldNumber
@@ -39,6 +40,8 @@ export interface UIInputFieldBase<Type> {
 	 * Note: This function must not depend on anything outside of its scope. If it does it will fail to compile and will be skipped.
 	 */
 	isVisibleFn?: string
+
+	width?: number
 }
 
 export interface UIInputFieldTextInput extends UIInputFieldBase<'textinput'> {
@@ -62,6 +65,10 @@ export interface UIInputFieldTextInput extends UIInputFieldBase<'textinput'> {
 	useVariables?: boolean
 
 	placeholder?: string
+}
+
+export interface UIInputFieldStaticText extends UIInputFieldBase<'static-text'> {
+	value: string
 }
 
 export interface UIInputFieldCheckbox extends UIInputFieldBase<'checkbox'> {
@@ -134,6 +141,8 @@ export interface UIInputFieldColor extends UIInputFieldBase<'colorpicker'> {
 	 */
 	default: number
 }
+
+export interface UIInputFieldCustomVariable extends UIInputFieldBase<'custom-variable'> {}
 
 export interface UIInputFieldInternalPage extends UIInputFieldBase<'internal:page'> {
 	/** The default value */

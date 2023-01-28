@@ -256,7 +256,7 @@ export default class FragmentActions<TOptions = Record<string, never>> extends C
 	 * @param {object} newProps
 	 * @access public
 	 */
-	actionReplace(newProps: ActionInstance) {
+	actionReplace(newProps: Pick<ActionInstance, 'id' | 'action' | 'options'>) {
 		for (const action_set of Object.values(this.action_sets)) {
 			for (const action of action_set) {
 				// Replace the new action in place

@@ -72,7 +72,7 @@ export default class InternalController extends CoreBase {
 			}
 
 			// Discover actions to process
-			if (control?.getAllActions && control?.actionReplace && typeof control.getAllActions === 'function') {
+			if (control?.actionReplace && typeof control.getAllActions === 'function') {
 				const actions = control.getAllActions()
 
 				for (const action of actions) {
@@ -136,6 +136,7 @@ export default class InternalController extends CoreBase {
 			info: {
 				page: parsedId?.type === 'bank' ? parsedId.page : undefined,
 				bank: parsedId?.type === 'bank' ? parsedId.bank : undefined,
+				deviceid: undefined,
 			},
 		}
 		this.feedbacks.set(feedback.id, cloned)

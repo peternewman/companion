@@ -20,11 +20,15 @@ export abstract class InternalFragment extends CoreBase {
 	calculateInstanceErrors?(instance_statuses: Record<string, InstanceStatus | undefined>): void
 }
 
+export interface InternalCallbackInfo {
+	page: number | undefined
+	bank: number | undefined
+
+	deviceid: string | undefined
+}
+
 export interface InternalFeedbackInstance extends FeedbackInstance {
 	controlId: string
 
-	info: {
-		page: number | undefined
-		bank: number | undefined
-	}
+	info: InternalCallbackInfo
 }

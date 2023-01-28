@@ -20,6 +20,8 @@ export interface ControlBaseWithFeedbacks<TStyle> {
 	 * @access public
 	 */
 	styleSetFields(diff: Partial<TStyle>): boolean
+
+	renameVariables(labelFrom: string, labelTo: string): void
 }
 
 export interface ControlBaseWithEvents {
@@ -239,12 +241,12 @@ export interface ControlBaseWithActions {
 		dropIndex: number
 	): boolean
 
-	// /**
-	//  * Remove an action from this control
-	//  * @param {object} newProps
-	//  * @access public
-	//  */
-	// actionReplace(newProps: ActionInstanceBase): boolean
+	/**
+	 * Remove an action from this control
+	 * @param {object} newProps
+	 * @access public
+	 */
+	actionReplace(newProps: Pick<ActionInstance, 'id' | 'action' | 'options'>): void
 
 	// /**
 	//  * Replace all the actions in a set
@@ -380,7 +382,7 @@ export default abstract class ControlBase<TConfigJson, TRuntimeJson = Record<str
 	/**
 	 * Get all the actions on this control
 	 */
-	getAllActions() {
+	getAllActions(): ActionInstance[] {
 		throw new Error('must be implemented by subclass!')
 	}
 

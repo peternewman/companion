@@ -269,7 +269,11 @@ export default class FragmentFeedbacks<TStyle> extends CoreBase {
 	 * @param {object} newProps
 	 * @access public
 	 */
-	feedbackReplace(newProps: FeedbackInstance & { style?: Partial<CompanionFeedbackButtonStyleResult> }) {
+	feedbackReplace(
+		newProps: Pick<FeedbackInstance, 'id' | 'type' | 'options'> & {
+			style?: Partial<CompanionFeedbackButtonStyleResult>
+		}
+	) {
 		for (const feedback of this.feedbacks) {
 			// Replace the new feedback in place
 			if (feedback.id === newProps.id) {

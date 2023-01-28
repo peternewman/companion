@@ -19,7 +19,7 @@ import { cloneDeep } from 'lodash-es'
 import { SplitVariableId, rgb } from '../Resources/Util.js'
 import { CreateBankControlId, ParsedBankId } from '../Shared/ControlId.js'
 import { ActionInstance, Registry, RunActionExtras } from '../tmp.js'
-import { InternalFeedbackInstance, InternalFragment } from './FragmantBase.js'
+import { InternalCallbackInfo, InternalFeedbackInstance, InternalFragment } from './FragmantBase.js'
 import { ActionDefinition, FeedbackDefinition } from '../Instance/Definitions.js'
 import { CompanionAdvancedFeedbackResult, CompanionOptionValues } from '@companion-module/base'
 import {
@@ -118,7 +118,7 @@ export default class Controls extends InternalFragment {
 		})
 	}
 
-	#fetchPageAndButton(options: Record<string, any>, info, useVariableFields?: boolean) {
+	#fetchPageAndButton(options: Record<string, any>, info: InternalCallbackInfo, useVariableFields?: boolean) {
 		let thePage = options.page
 		let theButton = options.bank
 

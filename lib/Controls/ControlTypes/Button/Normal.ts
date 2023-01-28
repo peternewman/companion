@@ -282,7 +282,7 @@ export default class ControlButtonNormal
 	 * @param {object} newProps
 	 * @access public
 	 */
-	actionReplace(newProps: ActionInstance) {
+	actionReplace(newProps: Pick<ActionInstance, 'id' | 'action' | 'options'>): void {
 		// TODO - use better type
 		for (const step of Object.values(this.steps)) {
 			step.actionReplace(newProps)

@@ -16,7 +16,7 @@
  */
 
 import { CompanionOptionValues, combineRgb } from '@companion-module/base'
-import { InternalFeedbackInstance, InternalFragment } from './FragmantBase.js'
+import { InternalCallbackInfo, InternalFeedbackInstance, InternalFragment } from './FragmantBase.js'
 import type { ActionInstance, Registry, RunActionExtras, VariableDefinition } from '../tmp.js'
 import { ActionDefinition, FeedbackDefinition } from '../Instance/Definitions.js'
 import {
@@ -105,7 +105,7 @@ export default class Surface extends InternalFragment {
 		})
 	}
 
-	#fetchControllerId(options: Record<string, any>, info: InternalFeedbackInstance['info'], useVariableFields: boolean) {
+	#fetchControllerId(options: Record<string, any>, info: InternalCallbackInfo, useVariableFields: boolean) {
 		let theController = options.controller
 
 		if (useVariableFields && options.controller_from_variable) {
@@ -119,7 +119,7 @@ export default class Surface extends InternalFragment {
 		return theController
 	}
 
-	#fetchPage(options: Record<string, any>, info: InternalFeedbackInstance['info'], useVariableFields: boolean) {
+	#fetchPage(options: Record<string, any>, info: InternalCallbackInfo, useVariableFields: boolean) {
 		let thePage = options.page
 
 		if (useVariableFields && options.page_from_variable) {
@@ -363,15 +363,15 @@ export default class Surface extends InternalFragment {
 					})
 				}
 			} else {
-				let newPage = toPage
-				if (newPage === '+1') {
+				let newPage: number
+				if (toPage === '+1') {
 					newPage = currentPage + 1
 					if (newPage > 99) newPage = 1
-				} else if (newPage === '-1') {
+				} else if (toPage === '-1') {
 					newPage = currentPage - 1
 					if (newPage < 1) newPage = 99
 				} else {
-					newPage = Number(newPage)
+					newPage = Number(toPage)
 				}
 				if (isNaN(newPage)) newPage = 1
 

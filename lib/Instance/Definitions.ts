@@ -228,9 +228,10 @@ class InstanceDefinitions extends CoreBase {
 			}
 
 			if (definition.options !== undefined && definition.options.length > 0) {
-				for (const j in definition.options) {
-					const opt = definition.options[j]
-					action.options[opt.id] = cloneDeep(opt.default)
+				for (const opt of definition.options) {
+					if ('default' in opt) {
+						action.options[opt.id] = cloneDeep(opt.default)
+					}
 				}
 			}
 
@@ -261,9 +262,10 @@ class InstanceDefinitions extends CoreBase {
 			}
 
 			if (definition.options !== undefined && definition.options.length > 0) {
-				for (const j in definition.options) {
-					const opt = definition.options[j]
-					feedback.options[opt.id] = cloneDeep(opt.default)
+				for (const opt of definition.options) {
+					if ('default' in opt) {
+						feedback.options[opt.id] = cloneDeep(opt.default)
+					}
 				}
 			}
 

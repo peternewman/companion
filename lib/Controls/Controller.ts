@@ -954,7 +954,7 @@ class ControlsController extends CoreBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	rotateControl(controlId: string, direction: boolean, deviceId: string | undefined) {
+	rotateControl(controlId: string, direction: boolean, deviceId: string | undefined): boolean {
 		const control = this.getControl(controlId)
 		if (control && typeof control.rotateControl === 'function') {
 			control.rotateControl(direction, deviceId)
@@ -972,7 +972,7 @@ class ControlsController extends CoreBase {
 	 */
 	renameVariables(labelFrom: string, labelTo: string): void {
 		for (const control of Object.values(this.#controls)) {
-			if (typeof control.renameVariables === 'function') {
+			if (control && typeof control.renameVariables === 'function') {
 				control.renameVariables(labelFrom, labelTo)
 			}
 		}
