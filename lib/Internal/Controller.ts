@@ -29,7 +29,7 @@ import { cloneDeep } from 'lodash-es'
 import { ParseControlId } from '../Shared/ControlId.js'
 import type { ActionInstance, FeedbackInstance, Registry, RunActionExtras } from '../tmp.js'
 import type { InternalFeedbackInstance, InternalFragment } from './FragmantBase.js'
-import type { InstanceStatus } from '../Instance/Status.js'
+import type { InstanceStatusValue } from '../Instance/Status.js'
 import { CompanionVariableValues } from '@companion-module/base'
 
 export default class InternalController extends CoreBase {
@@ -274,7 +274,7 @@ export default class InternalController extends CoreBase {
 	}
 
 	// HACK - Can we avoid having everything make calls into this or its children?
-	calculateInstanceErrors(instance_statuses: Record<string, InstanceStatus | undefined>): void {
+	calculateInstanceErrors(instance_statuses: Record<string, InstanceStatusValue | undefined>): void {
 		for (const fragment of this.fragments) {
 			if (typeof fragment.calculateInstanceErrors === 'function') {
 				fragment.calculateInstanceErrors(instance_statuses)

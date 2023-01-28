@@ -19,11 +19,11 @@ import { CompanionAdvancedFeedbackResult, combineRgb } from '@companion-module/b
 import { rgb } from '../Resources/Util.js'
 import { InternalFeedbackInstance, InternalFragment } from './FragmantBase.js'
 import type { ActionInstance, Registry, RunActionExtras, VariableDefinition } from '../tmp.js'
-import type { InstanceStatus } from '../Instance/Status.js'
+import type { InstanceStatusValue } from '../Instance/Status.js'
 import { ActionDefinition, FeedbackDefinition } from '../Instance/Definitions.js'
 
 export default class Instance extends InternalFragment {
-	private instance_statuses: Record<string, InstanceStatus | undefined> = {}
+	private instance_statuses: Record<string, InstanceStatusValue | undefined> = {}
 	private instance_errors = 0
 	private instance_warns = 0
 	private instance_oks = 0
@@ -252,7 +252,7 @@ export default class Instance extends InternalFragment {
 		})
 	}
 
-	calculateInstanceErrors(instance_statuses: Record<string, InstanceStatus | undefined>): void {
+	calculateInstanceErrors(instance_statuses: Record<string, InstanceStatusValue | undefined>): void {
 		let numError = 0
 		let numWarn = 0
 		let numOk = 0

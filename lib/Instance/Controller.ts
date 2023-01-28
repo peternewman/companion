@@ -23,30 +23,83 @@ import InstanceDefinitions from './Definitions.js'
 import InstanceVariable from './Variable.js'
 import path from 'path'
 import ModuleHost, { ConnectionDebugLogRoom } from './Host.js'
-import InstanceStatus from './Status.js'
-import { validateManifest } from '@companion-module/base'
+import InstanceStatus, { InstanceStatusValue } from './Status.js'
+import { ModuleManifest, validateManifest } from '@companion-module/base'
 import { fileURLToPath } from 'url'
 import { cloneDeep } from 'lodash-es'
 import jsonPatch from 'fast-json-patch'
 import { isLabelValid, makeLabelSafe } from '../Shared/Label.js'
+import type { Registry, SocketClient } from '../tmp.js'
 
 const InstancesRoom = 'instances'
+
+interface ModuleDisplayInfo {
+	id: string
+	name: string
+	version: string
+	hasHelp: boolean
+	bugUrl: string
+	shortname: string
+	manufacturer: string
+	products: string[]
+	keywords: string[]
+
+	isLegacy?: boolean
+}
+
+interface ModuleInfo {
+	manifest: ModuleManifest
+	basePath: string
+	helpPath: string | null
+	display: ModuleDisplayInfo
+	isPackaged: boolean
+
+	isOverride?: boolean
+}
+
+export interface InstanceStoreConfig {
+	instance_type: string
+	label: string
+	config: unknown
+
+	enabled: boolean
+	sortOrder: number
+
+	isFirstInit?: boolean
+}
+
+export interface UiInstanceConfig {
+	instance_type: string
+	label: string
+	enabled: boolean
+	sortOrder: number
+
+	// Runtime properties
+	hasRecordActionsHandler: boolean
+}
 
 class Instance extends CoreBase {
 	#lastClientJson = null
 
-	constructor(registry) {
+	variable: InstanceVariable
+	definitions: InstanceDefinitions
+	status: InstanceStatus
+	moduleHost: ModuleHost
+
+	/** Object of the known modules that can be loaded */
+	known_modules = new Map<string, ModuleInfo>()
+	/** Sometimes modules get renamed/merged. This lets that happen */
+	module_renames = new Map<string, string>()
+
+	store: { db: Record<string, InstanceStoreConfig | undefined> }
+
+	constructor(registry: Registry) {
 		super(registry, 'instance', 'Instance/Controller')
 
 		this.variable = new InstanceVariable(registry)
 		this.definitions = new InstanceDefinitions(registry)
 		this.status = new InstanceStatus(registry)
 		this.moduleHost = new ModuleHost(registry, this.status)
-
-		/** Object of the known modules that can be loaded */
-		this.known_modules = {}
-		/** Sometimes modules get renamed/merged. This lets that happen */
-		this.module_renames = {}
 
 		this.store = {
 			db: {},
@@ -59,9 +112,9 @@ class Instance extends CoreBase {
 
 		this.registry.api_router.get('/help/module/:module_id/*', (req, res, next) => {
 			const module_id = req.params.module_id.replace(/\.\.+/g, '')
-			const file = req.params[0].replace(/\.\.+/g, '')
+			const file = req.params.module_id.replace(/\.\.+/g, '')
 
-			const moduleInfo = this.known_modules[module_id]
+			const moduleInfo = this.known_modules.get(module_id)
 			if (moduleInfo && moduleInfo.helpPath && moduleInfo.basePath) {
 				const fullpath = path.join(moduleInfo.basePath, 'companion', file)
 				if (file.match(/\.(jpe?g|gif|png|pdf)$/) && fs.existsSync(fullpath)) {
@@ -84,7 +137,7 @@ class Instance extends CoreBase {
 	 * Handle an electron power event
 	 * @param {string} event
 	 */
-	powerStatusChange(event) {
+	powerStatusChange(event: string) {
 		if (event == 'resume') {
 			this.logger.info('Power: Resuming')
 
@@ -104,7 +157,7 @@ class Instance extends CoreBase {
 	 * Initialise instances
 	 * @param {string} extraModulePath - extra directory to search for modules
 	 */
-	async initInstances(extraModulePath) {
+	async initInstances(extraModulePath: string): Promise<void> {
 		this.logger.silly('instance_init', this.store.db)
 
 		const rootPath = isPackaged() ? path.join(__dirname, '.') : fileURLToPath(new URL('../../', import.meta.url))
@@ -119,7 +172,7 @@ class Instance extends CoreBase {
 		// Start with 'legacy' candidates
 		for (const candidate of legacyCandidates) {
 			candidate.display.isLegacy = true
-			this.known_modules[candidate.manifest.id] = candidate
+			this.known_modules.set(candidate.manifest.id, candidate)
 		}
 
 		// Load modules from other folders in order of priority
@@ -127,7 +180,7 @@ class Instance extends CoreBase {
 			const candidates = await this.#loadInfoForModulesInDir(searchDir, false)
 			for (const candidate of candidates) {
 				// Replace any existing candidate
-				this.known_modules[candidate.manifest.id] = candidate
+				this.known_modules.set(candidate.manifest.id, candidate)
 			}
 		}
 
@@ -136,10 +189,10 @@ class Instance extends CoreBase {
 			const candidates = await this.#loadInfoForModulesInDir(extraModulePath, true)
 			for (const candidate of candidates) {
 				// Replace any existing candidate
-				this.known_modules[candidate.manifest.id] = {
+				this.known_modules.set(candidate.manifest.id, {
 					...candidate,
 					isOverride: true,
-				}
+				})
 			}
 
 			this.logger.info(`Found ${candidates.length} extra modules`)
@@ -147,31 +200,31 @@ class Instance extends CoreBase {
 
 		// Figure out the redirects. We do this afterwards, to ensure we avoid collisions and stuff
 		for (const id of Object.keys(this.known_modules).sort()) {
-			const moduleInfo = this.known_modules[id]
+			const moduleInfo = this.known_modules.get(id)
 			if (moduleInfo && Array.isArray(moduleInfo.manifest.legacyIds)) {
 				if (moduleInfo.display.isLegacy) {
 					// Handle legacy modules differently. They should never replace a new style one
 					for (const legacyId of moduleInfo.manifest.legacyIds) {
-						const otherInfo = this.known_modules[legacyId]
+						const otherInfo = this.known_modules.get(legacyId)
 						if (!otherInfo || otherInfo.display.isLegacy) {
 							// Other is not known or is legacy
-							this.module_renames[legacyId] = id
-							delete this.known_modules[legacyId]
+							this.module_renames.set(legacyId, id)
+							this.known_modules.delete(legacyId)
 						}
 					}
 				} else {
 					// These should replace anything
 					for (const legacyId of moduleInfo.manifest.legacyIds) {
-						this.module_renames[legacyId] = id
-						delete this.known_modules[legacyId]
+						this.module_renames.set(legacyId, id)
+						this.known_modules.delete(legacyId)
 					}
 				}
 			}
 		}
 
 		// Log the loaded modules
-		for (const id of Object.keys(this.known_modules).sort()) {
-			const moduleInfo = this.known_modules[id]
+		const sortedModules = Array.from(this.known_modules.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+		for (const [_id, moduleInfo] of sortedModules) {
 			if (moduleInfo.isOverride) {
 				this.logger.info(
 					`${moduleInfo.display.id}@${moduleInfo.display.version}: ${moduleInfo.display.name} (Overridden${
@@ -188,7 +241,7 @@ class Instance extends CoreBase {
 		}
 	}
 
-	setInstanceLabelAndConfig(id, newLabel, config, skip_notify_instance) {
+	setInstanceLabelAndConfig(id: string, newLabel: string, config: unknown, skip_notify_instance?: boolean): void {
 		const entry = this.store.db[id]
 		if (!entry) {
 			this.logger.warn(`setInstanceLabelAndConfig id "${id}" does not exist!`)
@@ -217,14 +270,14 @@ class Instance extends CoreBase {
 		if (newLabel) {
 			this.instance.moduleHost.updateChildLabel(id, newLabel)
 			if (instance) {
-				instance.updateLabel(newLabel).catch((e) => {
+				instance.updateLabel(newLabel).catch((e: any) => {
 					instance.logger.warn('Error updating instance label: ' + e.message)
 				})
 			}
 		}
 
 		if (config && instance && !skip_notify_instance) {
-			instance.updateConfig(config).catch((e) => {
+			instance.updateConfig(config).catch((e: any) => {
 				instance.logger.warn('Error updating instance configuration: ' + e.message)
 			})
 		}
@@ -232,7 +285,7 @@ class Instance extends CoreBase {
 		this.logger.debug(`instance "${entry.label}" configuration updated`)
 	}
 
-	makeLabelUnique(prefix, ignoreId) {
+	makeLabelUnique(prefix: string, ignoreId?: string): string {
 		const knownLabels = new Set()
 		for (const [id, obj] of Object.entries(this.store.db)) {
 			if (id !== ignoreId && obj && obj.label) {
@@ -252,7 +305,7 @@ class Instance extends CoreBase {
 		return label
 	}
 
-	addInstance(data, disabled) {
+	addInstance(data, disabled): string | undefined {
 		let module = data.type
 		let product = data.product
 
@@ -265,13 +318,13 @@ class Instance extends CoreBase {
 					.filter((n) => typeof n === 'number')
 			) || 0
 
-		const moduleInfo = this.known_modules[module]
+		const moduleInfo = this.known_modules.get(module)
 		if (moduleInfo) {
 			let id = nanoid()
 
 			this.logger.info('Adding connection ' + module + ' ' + product)
 
-			this.store.db[id] = {
+			const config = (this.store.db[id] = {
 				instance_type: module,
 				sortOrder: highestRank + 1,
 				label: this.makeLabelUnique(moduleInfo.display.shortname),
@@ -279,10 +332,11 @@ class Instance extends CoreBase {
 				config: {
 					product: product,
 				},
-			}
+				enabled: false,
+			})
 
 			if (disabled) {
-				this.store.db[id].enabled = false
+				config.enabled = false
 			}
 
 			this.activate_module(id, true)
@@ -294,11 +348,11 @@ class Instance extends CoreBase {
 		}
 	}
 
-	getLabelForInstance(id) {
+	getLabelForInstance(id: string): string | undefined {
 		return this.store.db[id]?.label
 	}
 
-	getIdForLabel(label) {
+	getIdForLabel(label: string): string | undefined {
 		for (const [id, conf] of Object.entries(this.store.db)) {
 			if (conf && conf.label === label) {
 				return id
@@ -307,12 +361,13 @@ class Instance extends CoreBase {
 		return undefined
 	}
 
-	enableDisableInstance(id, state) {
-		if (this.store.db[id]) {
-			const label = this.store.db[id].label
-			if (this.store.db[id].enabled !== state) {
+	enableDisableInstance(id: string, state: boolean): void {
+		const instanceConfig = this.store.db[id]
+		if (instanceConfig) {
+			const label = instanceConfig.label
+			if (instanceConfig.enabled !== state) {
 				this.logger.info((state ? 'Enable' : 'Disable') + ' instance ' + label)
-				this.store.db[id].enabled = state
+				instanceConfig.enabled = state
 
 				if (state === false) {
 					this.moduleHost
@@ -342,8 +397,11 @@ class Instance extends CoreBase {
 		}
 	}
 
-	async deleteInstance(id) {
-		const label = this.store.db[id]?.label
+	async deleteInstance(id: string): Promise<void> {
+		const instanceConfig = this.store.db[id]
+		if (!instanceConfig) return
+
+		const label = instanceConfig.label
 		this.logger.info(`Deleting instance: ${label ?? id}`)
 
 		try {
@@ -377,15 +435,15 @@ class Instance extends CoreBase {
 	 * @param {string} instance_type
 	 * @returns {string} the instance_type that should be used (often the provided parameter)
 	 */
-	verifyInstanceTypeIsCurrent(instance_type) {
-		return this.module_renames[instance_type] || instance_type
+	verifyInstanceTypeIsCurrent(instance_type: string): string {
+		return this.module_renames.get(instance_type) || instance_type
 	}
 
 	/**
 	 * Get information for the metrics system about the current instances
 	 */
 	getInstancesMetrics() {
-		const instancesCounts = {}
+		const instancesCounts: Record<string, number> = {}
 
 		for (const instance_config of Object.values(this.store.db)) {
 			if (instance_config.instance_type !== 'bitfocus-companion' && instance_config.enabled !== false) {
@@ -427,7 +485,7 @@ class Instance extends CoreBase {
 		this.#lastClientJson = newJson
 	}
 
-	exportInstance(instanceId, clone = true) {
+	exportInstance(instanceId: string, clone = true) {
 		const obj = this.store.db[instanceId]
 
 		return clone ? cloneDeep(obj) : obj
@@ -442,7 +500,7 @@ class Instance extends CoreBase {
 	 * @param {String} instance_id
 	 * @returns {number} ??
 	 */
-	getInstanceStatus(instance_id) {
+	getInstanceStatus(instance_id: string): InstanceStatusValue | undefined {
 		return this.status.getInstanceStatus(instance_id)
 	}
 
@@ -451,7 +509,7 @@ class Instance extends CoreBase {
 	 * @param {String} instance_id
 	 * @returns {Object} ??
 	 */
-	getInstanceConfig(instance_id) {
+	getInstanceConfig(instance_id: string) {
 		return this.store.db[instance_id]
 	}
 
@@ -460,7 +518,7 @@ class Instance extends CoreBase {
 	 * @param {string} id
 	 * @param {boolean} is_being_created
 	 */
-	activate_module(id, is_being_created) {
+	activate_module(id: string, is_being_created?: boolean) {
 		const config = this.store.db[id]
 		if (!config) throw new Error('Cannot activate unknown module')
 
@@ -478,7 +536,7 @@ class Instance extends CoreBase {
 			this.setInstanceLabelAndConfig(id, safeLabel, null, true)
 		}
 
-		const moduleInfo = this.known_modules[config.instance_type]
+		const moduleInfo = this.known_modules.get(config.instance_type)
 		if (!moduleInfo) {
 			this.logger.error('Configured instance ' + config.instance_type + ' could not be loaded, unknown module')
 		} else {
@@ -493,7 +551,7 @@ class Instance extends CoreBase {
 	 * @param {SocketIO} client - the client socket
 	 * @access public
 	 */
-	clientConnect(client) {
+	clientConnect(client: SocketClient): void {
 		this.variable.clientConnect(client)
 		this.definitions.clientConnect(client)
 		this.status.clientConnect(client)
@@ -508,10 +566,10 @@ class Instance extends CoreBase {
 		})
 
 		client.onPromise('modules:get', () => {
-			return Object.values(this.known_modules).map((mod) => mod.display)
+			return Array.from(this.known_modules.values()).map((mod) => mod.display)
 		})
 
-		client.onPromise('instances:edit', async (id) => {
+		client.onPromise('instances:edit', async (id: string) => {
 			const instance = this.instance.moduleHost.getChild(id)
 			if (instance) {
 				try {
@@ -525,7 +583,7 @@ class Instance extends CoreBase {
 						config: instanceConf?.config,
 						instance_type: instanceConf?.instance_type,
 					}
-				} catch (e) {
+				} catch (e: any) {
 					this.logger.silly(`Failed to load instance config_fields: ${e.message}`)
 					return null
 				}
@@ -535,7 +593,7 @@ class Instance extends CoreBase {
 			}
 		})
 
-		client.onPromise('instances:set-config', (id, label, config) => {
+		client.onPromise('instances:set-config', (id: string, label: string, config: unknown) => {
 			const idUsingLabel = this.getIdForLabel(label)
 			if (idUsingLabel && idUsingLabel !== id) {
 				return 'duplicate label'
@@ -550,11 +608,11 @@ class Instance extends CoreBase {
 			return null
 		})
 
-		client.onPromise('instances:set-enabled', (id, state) => {
+		client.onPromise('instances:set-enabled', (id: string, state: boolean) => {
 			this.enableDisableInstance(id, !!state)
 		})
 
-		client.onPromise('instances:delete', async (id) => {
+		client.onPromise('instances:delete', async (id: string) => {
 			await this.deleteInstance(id)
 		})
 
@@ -563,7 +621,7 @@ class Instance extends CoreBase {
 			return id
 		})
 
-		client.onPromise('instances:get-help', async (module_id) => {
+		client.onPromise('instances:get-help', async (module_id: string) => {
 			try {
 				const res = await this.getHelpForModule(module_id)
 				if (res) {
@@ -578,7 +636,7 @@ class Instance extends CoreBase {
 			}
 		})
 
-		client.onPromise('instances:set-order', async (instanceIds) => {
+		client.onPromise('instances:set-order', async (instanceIds: string[]) => {
 			if (!Array.isArray(instanceIds)) throw new Error('Expected array of ids')
 
 			// This is a bit naive, but should be sufficient if the client behaves
@@ -591,7 +649,7 @@ class Instance extends CoreBase {
 
 			// Make sure all not provided are at the end in their original order
 			const allKnownIds = Object.entries(this.store.db)
-				.sort(([, a], [, b]) => a.sortOrder - b.sortOrder)
+				.sort(([, a], [, b]) => (a?.sortOrder ?? 0) - (b?.sortOrder ?? 0))
 				.map(([id]) => id)
 			let nextIndex = instanceIds.length
 			for (const id of allKnownIds) {
@@ -604,34 +662,36 @@ class Instance extends CoreBase {
 			this.commitChanges()
 		})
 
-		client.onPromise('connection-debug:subscribe', (connectionId) => {
+		client.onPromise('connection-debug:subscribe', (connectionId: string) => {
 			if (!this.store.db[connectionId]) throw new Error('Unknown connection')
 
 			client.join(ConnectionDebugLogRoom(connectionId))
 		})
 
-		client.onPromise('connection-debug:unsubscribe', (connectionId) => {
+		client.onPromise('connection-debug:unsubscribe', (connectionId: string) => {
 			client.leave(ConnectionDebugLogRoom(connectionId))
 		})
 	}
 
-	getClientJson() {
-		const result = {}
+	getClientJson(): Record<string, UiInstanceConfig> {
+		const result: Record<string, UiInstanceConfig> = {}
 
 		for (const [id, config] of Object.entries(this.store.db)) {
-			result[id] = {
-				instance_type: config.instance_type,
-				label: config.label,
-				enabled: config.enabled,
-				sortOrder: config.sortOrder,
+			if (config) {
+				result[id] = {
+					instance_type: config.instance_type,
+					label: config.label,
+					enabled: config.enabled,
+					sortOrder: config.sortOrder,
 
-				// Runtime properties
-				hasRecordActionsHandler: false,
-			}
+					// Runtime properties
+					hasRecordActionsHandler: false,
+				}
 
-			const instance = this.moduleHost.getChild(id)
-			if (instance) {
-				result[id].hasRecordActionsHandler = instance.hasRecordActionsHandler
+				const instance = this.moduleHost.getChild(id)
+				if (instance) {
+					result[id].hasRecordActionsHandler = instance.hasRecordActionsHandler
+				}
 			}
 		}
 
@@ -643,8 +703,8 @@ class Instance extends CoreBase {
 	 * @access public
 	 * @param {string} module_id
 	 */
-	async getHelpForModule(module_id) {
-		const moduleInfo = this.known_modules[module_id]
+	async getHelpForModule(module_id: string): Promise<{ markdown: string; baseUrl: string } | undefined> {
+		const moduleInfo = this.known_modules.get(module_id)
 		if (moduleInfo && moduleInfo.helpPath) {
 			const stats = await fs.stat(moduleInfo.helpPath)
 			if (stats.isFile()) {
@@ -669,7 +729,7 @@ class Instance extends CoreBase {
 	 * @param {string} searchDir - Path to search for modules
 	 * @param {boolean} checkForPackaged - Whether to check for a packaged version
 	 */
-	async #loadInfoForModulesInDir(searchDir, checkForPackaged) {
+	async #loadInfoForModulesInDir(searchDir: string, checkForPackaged: boolean): Promise<ModuleInfo[]> {
 		if (await fs.pathExists(searchDir)) {
 			const candidates = await fs.readdir(searchDir)
 
@@ -681,7 +741,7 @@ class Instance extends CoreBase {
 			}
 
 			const res = await Promise.all(ps)
-			return res.filter((v) => !!v)
+			return res.filter((v): v is ModuleInfo => !!v)
 		} else {
 			return []
 		}
@@ -693,7 +753,7 @@ class Instance extends CoreBase {
 	 * @param {string} fullpath - Fullpath to the module
 	 * @param {boolean} checkForPackaged - Whether to check for a packaged version
 	 */
-	async #loadInfoForModule(fullpath, checkForPackaged) {
+	async #loadInfoForModule(fullpath: string, checkForPackaged: boolean): Promise<ModuleInfo | undefined> {
 		try {
 			let isPackaged = false
 			const pkgDir = path.join(fullpath, 'pkg')
@@ -719,7 +779,7 @@ class Instance extends CoreBase {
 			const helpPath = path.join(fullpath, 'companion/HELP.md')
 
 			const hasHelp = await fs.pathExists(helpPath)
-			const moduleDisplay = {
+			const moduleDisplay: ModuleDisplayInfo = {
 				id: manifestJson.id,
 				name: manifestJson.manufacturer + ':' + manifestJson.products.join(';'),
 				version: manifestJson.version,
@@ -731,7 +791,7 @@ class Instance extends CoreBase {
 				keywords: manifestJson.keywords,
 			}
 
-			const moduleManifestExt = {
+			const moduleManifestExt: ModuleInfo = {
 				manifest: manifestJson,
 				basePath: path.resolve(fullpath),
 				helpPath: hasHelp ? helpPath : null,
@@ -745,6 +805,7 @@ class Instance extends CoreBase {
 		} catch (e) {
 			this.logger.silly(`Error loading module from ${fullpath}`, e)
 			this.logger.error(`Error loading module from "${fullpath}": ` + e)
+			return undefined
 		}
 	}
 }

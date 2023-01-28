@@ -1,8 +1,7 @@
 import jsonPatch from 'fast-json-patch'
 import { isEqual } from 'lodash-es'
 import CoreBase from '../Core/Base.js'
-import type { SocketClient } from '../tmp.js'
-import type Registry from '../Registry.js'
+import type { SocketClient, Registry } from '../tmp.js'
 import type { InstanceStatus as ModuleStatusLevel } from '@companion-module/base'
 
 export enum InstanceStatusCategory {
@@ -11,7 +10,7 @@ export enum InstanceStatusCategory {
 	Good = 'good',
 }
 
-export interface InstanceStatus {
+export interface InstanceStatusValue {
 	category: InstanceStatusCategory | null
 	level: ModuleStatusLevel | 'crashed' | null
 	message: string | undefined
@@ -23,7 +22,7 @@ class Status extends CoreBase {
 	 * levels: null = unknown, see updateInstanceStatus for possible values
 	 * @access private
 	 */
-	#instanceStatuses: Record<string, InstanceStatus | undefined> = {}
+	#instanceStatuses: Record<string, InstanceStatusValue | undefined> = {}
 
 	constructor(registry: Registry) {
 		super(registry, 'instance', 'Instance/Status')
@@ -74,7 +73,7 @@ class Status extends CoreBase {
 				break
 		}
 
-		const newStatuses: Record<string, InstanceStatus | undefined> = { ...this.#instanceStatuses }
+		const newStatuses: Record<string, InstanceStatusValue | undefined> = { ...this.#instanceStatuses }
 		newStatuses[instance_id] = {
 			category: category,
 			level: level,
@@ -106,7 +105,7 @@ class Status extends CoreBase {
 		this.#setStatuses(newStatuses)
 	}
 
-	#setStatuses(newObj: Record<string, InstanceStatus | undefined>) {
+	#setStatuses(newObj: Record<string, InstanceStatusValue | undefined>) {
 		const patch = jsonPatch.compare(this.#instanceStatuses || {}, newObj || {})
 		if (patch.length > 0) {
 			// TODO - make this be a subscription with a dedicated room

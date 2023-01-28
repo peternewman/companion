@@ -3,12 +3,12 @@ import { nanoid } from 'nanoid'
 import CoreBase from '../Core/Base.js'
 import { CreateBankControlId } from '../Shared/ControlId.js'
 import { EventDefinitions } from '../Resources/EventDefinitions.js'
-import type Registry from '../Registry.js'
 import {
 	ActionInstance,
 	ButtonDrawStyle,
 	Complete,
 	FeedbackInstance,
+	Registry,
 	SocketClient,
 	TriggerEventInstance,
 } from '../tmp.js'
