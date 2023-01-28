@@ -206,7 +206,7 @@ export default class FragmentActions<TOptions = Record<string, never>> extends C
 			if (action) {
 				const instance = this.instance.moduleHost.getChild(action.instance)
 				if (instance) {
-					const newOptions = await instance.actionLearnValues(action)
+					const newOptions = await instance.actionLearnValues(action, this.controlId)
 					if (newOptions) {
 						const newAction = {
 							...action,
