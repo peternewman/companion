@@ -203,7 +203,7 @@ export default class InstanceCustomVariable extends CoreBase {
 		}
 	}
 
-	setPersistence(name: string, persistent: boolean) {
+	setPersistence(name: string, persistent: boolean): string | undefined {
 		if (!this.custom_variables[name]) {
 			return 'Unknown name'
 		}
@@ -228,12 +228,15 @@ export default class InstanceCustomVariable extends CoreBase {
 		if (patch.length > 0) {
 			this.io.emitToRoom(CustomVariablesRoom, 'custom-variables:update', patch)
 		}
+
+		return undefined
 	}
 
-	setValue(name: string, value: string) {
+	setValue(name: string, value: string): string | undefined {
 		if (this.custom_variables[name]) {
 			this.logger.silly(`Set value "${name}":${value}`)
 			this.#setValueInner(name, value)
+			return undefined
 		} else {
 			return 'Unknown name'
 		}
@@ -284,7 +287,7 @@ export default class InstanceCustomVariable extends CoreBase {
 	 * @returns success
 	 * @access public
 	 */
-	setValueToExpression(name: string, expression: string) {
+	setValueToExpression(name: string, expression: string): boolean {
 		if (this.custom_variables[name]) {
 			try {
 				const result = this.base.parseExpression(expression)
@@ -292,9 +295,9 @@ export default class InstanceCustomVariable extends CoreBase {
 				return true
 			} catch (error: any) {
 				this.logger.warn(`${error.toString()}, in expression: "${expression}"`)
-				return false
 			}
 		}
+		return false
 	}
 
 	/**

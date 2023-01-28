@@ -78,7 +78,7 @@ export default class InternalController extends CoreBase {
 				for (const action of actions) {
 					if (action.instance === 'internal') {
 						// Try and run an upgrade
-						const newAction = this.actionUpgrade(action)
+						const newAction = this.actionUpgrade(action, controlId)
 						if (newAction) {
 							control.actionReplace(newAction)
 						}
@@ -100,13 +100,13 @@ export default class InternalController extends CoreBase {
 	 * @param {object} action
 	 * @param {*} controlId
 	 */
-	actionUpgrade(action: ActionInstance, controlId: string) {
+	actionUpgrade(action: ActionInstance, controlId: string): ActionInstance | undefined {
 		for (const fragment of this.fragments) {
 			if (typeof fragment.actionUpgrade === 'function') {
 				try {
 					const newAction = fragment.actionUpgrade(action, controlId)
 					if (newAction !== undefined) {
-						newAction.actionId = newAction.action
+						// newAction.actionId = newAction.action
 						// It was handled, so break
 						return newAction
 					}

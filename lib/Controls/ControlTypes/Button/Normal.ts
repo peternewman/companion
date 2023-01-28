@@ -4,7 +4,6 @@ import FragmentActions from '../../Fragments/FragmentActions.js'
 import { clamp } from '../../../Resources/Util.js'
 import { GetStepIds } from '../../../Shared/Controls.js'
 import type { ActionInstance, ButtonDrawStyleBase, Complete, FeedbackInstance, Registry } from '../../../tmp.js'
-import { ActionInstanceBase } from '@companion-module/base/dist/host-api/api.js'
 import { ControlBaseWithDynamicActionSets, ControlBaseWithActions, ControlBaseWithSteps } from '../../ControlBase.js'
 
 export interface ButtonConfig {
@@ -200,7 +199,7 @@ export default class ControlButtonNormal
 	 * @param {boolean} enabled
 	 * @access public
 	 */
-	actionEnabled(stepId: string, setId: string, id: string, enabled: boolean) {
+	actionEnabled(stepId: string, setId: string, id: string, enabled: boolean): boolean {
 		const step = this.steps[stepId]
 		if (step) {
 			return step.actionEnabled(setId, id, enabled)
@@ -283,7 +282,7 @@ export default class ControlButtonNormal
 	 * @param {object} newProps
 	 * @access public
 	 */
-	actionReplace(newProps: ActionInstanceBase) {
+	actionReplace(newProps: ActionInstance) {
 		// TODO - use better type
 		for (const step of Object.values(this.steps)) {
 			step.actionReplace(newProps)

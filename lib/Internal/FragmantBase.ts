@@ -9,6 +9,7 @@ export abstract class InternalFragment extends CoreBase {
 
 	getActionDefinitions?(): Record<string, ActionDefinition>
 	executeAction?(action: ActionInstance, extras: RunActionExtras): boolean | undefined
+	actionUpgrade?(action: ActionInstance, controlId: string): ActionInstance | undefined
 
 	getFeedbackDefinitions?(): Record<string, FeedbackDefinition>
 	executeFeedback?(feedback: InternalFeedbackInstance): Partial<CompanionAdvancedFeedbackResult> | boolean | undefined

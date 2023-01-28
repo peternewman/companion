@@ -2,7 +2,6 @@ import CoreBase from '../../Core/Base.js'
 import { cloneDeep } from 'lodash-es'
 import { nanoid } from 'nanoid'
 import type { ActionInstance, Registry } from '../../tmp.js'
-import { ActionInstanceBase } from '@companion-module/base/dist/host-api/api.js'
 
 /**
  * Helper for ControlTypes with actions
@@ -66,7 +65,7 @@ export default class FragmentActions<TOptions = Record<string, never>> extends C
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionAdd(setId: string, actionItem: ActionInstance) {
+	actionAdd(setId: string, actionItem: ActionInstance): boolean {
 		if (this.action_sets[setId] === undefined) {
 			// cant implicitly create a set
 			this.logger.silly(`Missing set ${this.controlId}:${setId}`)
@@ -80,6 +79,8 @@ export default class FragmentActions<TOptions = Record<string, never>> extends C
 		this.commitChange(false)
 
 		this.checkButtonStatus()
+
+		return true
 	}
 
 	/**
@@ -166,7 +167,7 @@ export default class FragmentActions<TOptions = Record<string, never>> extends C
 	 * @param {boolean} enabled
 	 * @access public
 	 */
-	actionEnabled(setId: string, id: string, enabled: boolean) {
+	actionEnabled(setId: string, id: string, enabled: boolean): boolean {
 		const action_set = this.action_sets[setId]
 		if (action_set) {
 			for (const action of action_set) {
@@ -188,6 +189,7 @@ export default class FragmentActions<TOptions = Record<string, never>> extends C
 				}
 			}
 		}
+		return false
 	}
 
 	/**
@@ -254,12 +256,12 @@ export default class FragmentActions<TOptions = Record<string, never>> extends C
 	 * @param {object} newProps
 	 * @access public
 	 */
-	actionReplace(newProps: ActionInstanceBase) {
+	actionReplace(newProps: ActionInstance) {
 		for (const action_set of Object.values(this.action_sets)) {
 			for (const action of action_set) {
 				// Replace the new action in place
 				if (action.id === newProps.id) {
-					action.action = newProps.actionId
+					action.action = newProps.action
 					action.options = newProps.options
 
 					delete action.upgradeIndex

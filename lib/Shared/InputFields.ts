@@ -14,7 +14,8 @@ export type SomeUIInputField =
 	| UIInputFieldInternalVariable
 	| UIInputFieldInternalCustomVariable
 	| UIInputFieldInternalTrigger
-	| UIInputFieldInternalInstance
+	| UIInputFieldInternalInstance<true>
+	| UIInputFieldInternalInstance<false>
 
 export function serializeIsVisibleFn(fn: (options: CompanionOptionValues) => boolean): string {
 	return fn.toString()
@@ -161,8 +162,12 @@ export interface UIInputFieldInternalCustomVariable extends UIInputFieldBase<'in
 
 export interface UIInputFieldInternalTrigger extends UIInputFieldBase<'internal:trigger'> {}
 
-export interface UIInputFieldInternalInstance extends UIInputFieldBase<'internal:instance_id'> {
+export interface UIInputFieldInternalInstance<TMultiple extends boolean>
+	extends UIInputFieldBase<'internal:instance_id'> {
 	includeAll?: boolean
+	filterActionsRecorder?: boolean
 
-	default?: 'all'
+	multiple?: TMultiple
+
+	default?: TMultiple extends true ? never : 'all'
 }

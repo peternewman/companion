@@ -18,6 +18,7 @@
 import { ActionDefinition, FeedbackDefinition } from '../Instance/Definitions.js'
 import { rgb } from '../Resources/Util.js'
 import { CreateBankControlId } from '../Shared/ControlId.js'
+import { UIInputFieldInternalInstance } from '../Shared/InputFields.js'
 import type { ActionInstance, FeedbackInstance, Registry, RunActionExtras, VariableDefinition } from '../tmp.js'
 import { InternalFragment } from './FragmantBase.js'
 
@@ -85,7 +86,6 @@ export default class ActionRecorder extends InternalFragment {
 						multiple: true,
 						includeAll: false,
 						filterActionsRecorder: true,
-						default: [],
 					},
 				],
 			},
@@ -155,7 +155,7 @@ export default class ActionRecorder extends InternalFragment {
 			if (session) {
 				let result = new Set(session.instanceIds)
 
-				const selectedIds = new Set(action.options.connections)
+				const selectedIds = new Set<string>(action.options.connections)
 
 				switch (action.options.mode) {
 					case 'set':
@@ -209,7 +209,7 @@ export default class ActionRecorder extends InternalFragment {
 					this.registry.controls.actionRecorder.saveToControlId(controlId, stepId, setId, action.options.mode)
 				} catch (e) {
 					// We don't have a good way to present this to the user, so ignore it for now. They should notice that it didnt work
-					this.logger('info', `action_recorder_save_to_button failed: ${e}`)
+					this.logger.log('info', `action_recorder_save_to_button failed: ${e}`)
 				}
 			}
 
@@ -239,8 +239,7 @@ export default class ActionRecorder extends InternalFragment {
 						multiple: true,
 						includeAll: false,
 						filterActionsRecorder: true,
-						default: [],
-					},
+					} satisfies UIInputFieldInternalInstance<true>,
 					{
 						type: 'dropdown',
 						label: 'Mode',
