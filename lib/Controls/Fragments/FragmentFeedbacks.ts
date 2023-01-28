@@ -342,8 +342,8 @@ export default class FragmentFeedbacks<TStyle> extends CoreBase {
 				if (!definition || definition.type !== 'boolean') return false
 
 				const defaultStyle = definition.style || {}
-				const oldStyle: Partial<CompanionFeedbackButtonStyleResult> = feedback.style || {}
-				const newStyle: Partial<CompanionFeedbackButtonStyleResult> = {}
+				const oldStyle: any = feedback.style || {}
+				const newStyle: any = {}
 
 				for (const key of selected) {
 					if (key in oldStyle) {
@@ -351,7 +351,7 @@ export default class FragmentFeedbacks<TStyle> extends CoreBase {
 						newStyle[key] = oldStyle[key]
 					} else {
 						// copy bank value, as a default
-						newStyle[key] = defaultStyle[key] !== undefined ? defaultStyle[key] : this.baseStyle[key]
+						newStyle[key] = defaultStyle[key] !== undefined ? defaultStyle[key] : (this.baseStyle as any)[key]
 
 						// png needs to be set to something harmless
 						if (key === 'png64' && !newStyle[key]) {
@@ -365,7 +365,7 @@ export default class FragmentFeedbacks<TStyle> extends CoreBase {
 							oldStyle['textExpression'] ??
 							(defaultStyle['textExpression'] !== undefined
 								? defaultStyle['textExpression']
-								: this.baseStyle['textExpression'])
+								: (this.baseStyle as any)['textExpression'])
 					}
 				}
 				feedback.style = newStyle
@@ -404,7 +404,7 @@ export default class FragmentFeedbacks<TStyle> extends CoreBase {
 				if (!definition || definition.type !== 'boolean') return false
 
 				if (!feedback.style) feedback.style = {}
-				feedback.style[key] = value
+				;(feedback.style as any)[key] = value
 
 				this.commitChange()
 
@@ -467,7 +467,7 @@ export default class FragmentFeedbacks<TStyle> extends CoreBase {
 	getUnparsedStyle(): TStyle {
 		if (this.#booleanOnly) throw new Error('FragmentFeedbacks not setup to use styles')
 
-		let style = { ...this.baseStyle }
+		let style: any = { ...this.baseStyle }
 
 		// Iterate through feedback-overrides
 		for (const feedback of this.feedbacks) {
@@ -483,14 +483,14 @@ export default class FragmentFeedbacks<TStyle> extends CoreBase {
 					}
 				} else if (definition.type === 'advanced' && typeof rawValue === 'object') {
 					// Prune off some special properties
-					const prunedValue = { ...rawValue }
+					const prunedValue: any = { ...rawValue }
 					delete prunedValue.imageBuffer
 					delete prunedValue.imageBufferPosition
 
 					// Ensure `textExpression` is set at the same times as `text`
 					delete prunedValue.textExpression
 					if ('text' in prunedValue) {
-						prunedValue.textExpression = rawValue.textExpression || false
+						prunedValue.textExpression = !!(rawValue as any).textExpression
 					}
 
 					style = {

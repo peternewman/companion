@@ -20,6 +20,7 @@ import { nanoid } from 'nanoid'
 import TriggerEvents from './TriggerEvents.js'
 import type { Registry, SocketClient } from '../tmp.js'
 import { MAX_BUTTONS } from '../Resources/Constants.js'
+import { CompanionAdvancedFeedbackResult } from '@companion-module/base'
 
 export const TriggersListRoom = 'triggers:list'
 
@@ -227,7 +228,7 @@ class ControlsController extends CoreBase {
 			return true
 		})
 
-		client.onPromise('controls:set-style-fields', (controlId: string, diff) => {
+		client.onPromise('controls:set-style-fields', (controlId: string, diff: Partial<unknown>) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -818,7 +819,9 @@ class ControlsController extends CoreBase {
 		const result = {}
 
 		for (const [controlId, control] of Object.entries(this.#controls)) {
-			result[controlId] = control.toJSON(false)
+			if (control) {
+				result[controlId] = control.toJSON(false)
+			}
 		}
 
 		return clone ? cloneDeep(result) : result
@@ -918,7 +921,7 @@ class ControlsController extends CoreBase {
 
 		if (allChangedVariables.length > 0) {
 			for (const control of Object.values(this.#controls)) {
-				if (typeof control.onVariablesChanged === 'function') {
+				if (control && typeof control.onVariablesChanged === 'function') {
 					control.onVariablesChanged(allChangedVariables)
 				}
 			}
@@ -1012,7 +1015,7 @@ class ControlsController extends CoreBase {
 		// Notify interested parties
 		const parsedId = ParseControlId(controlId)
 		if (parsedId?.type === 'bank') {
-			this.services.emberplus.updateBankState(parsedId.page, parsedId.bank, false)
+			this.services.emberplus.updateBankState(parsedId.page, parsedId.bank, false, undefined)
 		}
 
 		if (newType) {
@@ -1031,18 +1034,19 @@ class ControlsController extends CoreBase {
 	 * @access public
 	 */
 	updateFeedbackValues(instanceId: string, result): void {
-		const values = {}
+		const values: Record<string, Record<string, boolean | CompanionAdvancedFeedbackResult> | undefined> = {}
 
 		for (const item of result) {
-			if (!values[item.controlId]) values[item.controlId] = {}
+			const objForControl = values[item.controlId] || {}
+			values[item.controlId] = objForControl
 
-			values[item.controlId][item.id] = item.value
+			objForControl[item.id] = item.value
 		}
 
 		// Pass values to controls
 		for (const [controlId, newValues] of Object.entries(values)) {
 			const control = this.getControl(controlId)
-			if (control && control.feedbacks && typeof control.feedbacks.updateFeedbackValues === 'function') {
+			if (control && control.feedbacks && newValues && typeof control.feedbacks.updateFeedbackValues === 'function') {
 				control.feedbacks.updateFeedbackValues(instanceId, newValues)
 			}
 		}
@@ -1081,11 +1085,11 @@ class ControlsController extends CoreBase {
 	 * @access public
 	 */
 	verifyInstanceIds(): void {
-		const knownInstanceIds = new Set(this.instance.getAllInstanceIds())
+		const knownInstanceIds = new Set<string>(this.instance.getAllInstanceIds())
 		knownInstanceIds.add('internal')
 
 		for (const control of Object.values(this.#controls)) {
-			if (typeof control.verifyInstanceIds === 'function') {
+			if (control && typeof control.verifyInstanceIds === 'function') {
 				control.verifyInstanceIds(knownInstanceIds)
 			}
 		}

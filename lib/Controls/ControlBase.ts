@@ -2,7 +2,7 @@ import { cloneDeep } from 'lodash-es'
 import CoreBase from '../Core/Base.js'
 import jsonPatch from 'fast-json-patch'
 import debounceFn from 'debounce-fn'
-import { ActionInstance, Registry, TriggerEventInstance } from '../tmp.js'
+import { ActionInstance, Registry, SomeDrawStyle, TriggerEventInstance } from '../tmp.js'
 import { Size } from '../Resources/Util.js'
 import FragmentFeedbacks from './Fragments/FragmentFeedbacks.js'
 
@@ -456,4 +456,8 @@ export default abstract class ControlBase<TConfigJson, TRuntimeJson = Record<str
 	)
 
 	abstract forgetInstance(instanceId: string): void
+
+	getDrawStyle?(): SomeDrawStyle
+
+	verifyInstanceIds?(knownInstanceIds: Set<string>): void
 }

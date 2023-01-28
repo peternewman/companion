@@ -7,6 +7,7 @@ type TriggerEventsEvents = {
 	client_connect: []
 	startup: []
 	variables_changed: [allChangedVariables: Set<string>]
+	control_press: [controlId: string, pressed: boolean, deviceId: string | undefined]
 }
 
 /**

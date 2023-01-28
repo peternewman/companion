@@ -17,7 +17,7 @@
 
 import crypto from 'crypto'
 import CoreBase from '../Core/Base.js'
-import Registry from '../Registry.js'
+import { Registry } from '../tmp.js'
 import got from 'got'
 
 interface MetricsPayload {

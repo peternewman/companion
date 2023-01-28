@@ -3,7 +3,15 @@ import { cloneDeep } from 'lodash-es'
 import FragmentActions from '../../Fragments/FragmentActions.js'
 import { clamp } from '../../../Resources/Util.js'
 import { GetStepIds } from '../../../Shared/Controls.js'
-import type { ActionInstance, ButtonDrawStyleBase, Complete, FeedbackInstance, Registry } from '../../../tmp.js'
+import type {
+	ActionInstance,
+	ButtonDrawStyle,
+	ButtonDrawStyleBase,
+	Complete,
+	FeedbackInstance,
+	Registry,
+	SomeDrawStyle,
+} from '../../../tmp.js'
 import { ControlBaseWithDynamicActionSets, ControlBaseWithActions, ControlBaseWithSteps } from '../../ControlBase.js'
 
 export interface ButtonConfig {
@@ -499,7 +507,7 @@ export default class ControlButtonNormal
 	 * @returns the processed style of the button
 	 * @override
 	 */
-	getDrawStyle() {
+	getDrawStyle(): ButtonDrawStyle {
 		const style = super.getDrawStyle()
 
 		if (GetStepIds(this.steps).length > 1) {

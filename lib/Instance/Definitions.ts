@@ -4,7 +4,14 @@ import CoreBase from '../Core/Base.js'
 import { CreateBankControlId } from '../Shared/ControlId.js'
 import { EventDefinitions } from '../Resources/EventDefinitions.js'
 import type Registry from '../Registry.js'
-import { ActionInstance, Complete, FeedbackInstance, SocketClient, TriggerEventInstance } from '../tmp.js'
+import {
+	ActionInstance,
+	ButtonDrawStyle,
+	Complete,
+	FeedbackInstance,
+	SocketClient,
+	TriggerEventInstance,
+} from '../tmp.js'
 import {
 	CompanionButtonPresetOptions,
 	CompanionButtonStyleProps,
@@ -14,6 +21,7 @@ import {
 } from '@companion-module/base'
 import ControlButtonNormal, { ButtonConfig } from '../Controls/ControlTypes/Button/Normal.js'
 import { SomeUIInputField } from '../Shared/InputFields.js'
+import { rgb } from '../Resources/Util.js'
 
 const PresetsRoom = 'presets'
 const ActionsRoom = 'action-definitions'
@@ -191,9 +199,28 @@ class InstanceDefinitions extends CoreBase {
 		client.onPromise('presets:preview_render', (instanceId: string, preset_id: string) => {
 			const definition = this.#presetDefinitions[instanceId]?.[preset_id]
 			if (definition) {
-				const style = {
-					...definition.style,
+				const style: ButtonDrawStyle = {
 					style: definition.type,
+
+					text: definition.style.text || '',
+					size: (definition.style.size as any) ?? 'auto',
+					color: definition.style.color ?? rgb(255, 255, 255),
+					bgcolor: definition.style.bgcolor ?? 0,
+					alignment: definition.style.alignment ?? 'center:center',
+					pngalignment: definition.style.pngalignment ?? 'center:center',
+					png64: definition.style.png64 ?? null,
+
+					textExpression: false, // TODO use from preset?
+
+					show_topbar: 'default',
+					imageBuffers: [],
+
+					// style: 'button'
+					pushed: false,
+					step_cycle: undefined,
+					bank_status: undefined,
+					action_running: false,
+					cloud: false,
 				}
 
 				if (style.text) style.text = this.instance.variable.parseVariables(style.text).text

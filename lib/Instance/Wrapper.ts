@@ -19,7 +19,6 @@ import type {
 	SetStatusMessage,
 	SetVariableDefinitionsMessage,
 	SetVariableValuesMessage,
-	UpdateActionInstancesMessage,
 	UpdateFeedbackInstancesMessage,
 	UpdateFeedbackValuesMessage,
 	UpgradedDataResponseMessage,
@@ -319,17 +318,17 @@ class SocketEventsHandler {
 		return allActions
 	}
 
-	/**
-	 * Send all action instances to the child process
-	 * @access private
-	 */
-	async #sendAllActionInstances(): Promise<void> {
-		const msg: UpdateActionInstancesMessage = {
-			actions: this.#getAllActionInstances(),
-		}
+	// /**
+	//  * Send all action instances to the child process
+	//  * @access private
+	//  */
+	// async #sendAllActionInstances(): Promise<void> {
+	// 	const msg: UpdateActionInstancesMessage = {
+	// 		actions: this.#getAllActionInstances(),
+	// 	}
 
-		await this.ipcWrapper.sendWithCb('updateActions', msg)
-	}
+	// 	await this.ipcWrapper.sendWithCb('updateActions', msg)
+	// }
 
 	/**
 	 * Inform the child instance class about an updated feedback
