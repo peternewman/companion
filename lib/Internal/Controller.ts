@@ -27,9 +27,10 @@ import Triggers from './Triggers.js'
 import Variables from './Variables.js'
 import { cloneDeep } from 'lodash-es'
 import { ParseControlId } from '../Shared/ControlId.js'
-import type { ActionInstance, Registry, RunActionExtras } from '../tmp.js'
-import type { InternalFragment } from './FragmantBase.js'
+import type { ActionInstance, FeedbackInstance, Registry, RunActionExtras } from '../tmp.js'
+import type { InternalFeedbackInstance, InternalFragment } from './FragmantBase.js'
 import type { InstanceStatus } from '../Instance/Status.js'
+import { CompanionVariableValues } from '@companion-module/base'
 
 export default class InternalController extends CoreBase {
 	feedbacks = new Map()
@@ -62,7 +63,7 @@ export default class InternalController extends CoreBase {
 		const allControls = this.registry.controls.getAllControls()
 		for (const [controlId, control] of Object.entries(allControls)) {
 			// Discover feedbacks to process
-			if (control.feedbacks && control.feedbacks.feedbacks) {
+			if (control && control.feedbacks && control.feedbacks.feedbacks) {
 				for (const feedback of control.feedbacks.feedbacks) {
 					if (feedback.instance_id === 'internal') {
 						this.feedbackUpdate(feedback, controlId)
@@ -71,7 +72,7 @@ export default class InternalController extends CoreBase {
 			}
 
 			// Discover actions to process
-			if (control.actionReplace && typeof control.getAllActions === 'function') {
+			if (control?.getAllActions && control?.actionReplace && typeof control.getAllActions === 'function') {
 				const actions = control.getAllActions()
 
 				for (const action of actions) {
@@ -99,7 +100,7 @@ export default class InternalController extends CoreBase {
 	 * @param {object} action
 	 * @param {*} controlId
 	 */
-	actionUpgrade(action, controlId: string) {
+	actionUpgrade(action: ActionInstance, controlId: string) {
 		for (const fragment of this.fragments) {
 			if (typeof fragment.actionUpgrade === 'function') {
 				try {
@@ -109,7 +110,7 @@ export default class InternalController extends CoreBase {
 						// It was handled, so break
 						return newAction
 					}
-				} catch (e) {
+				} catch (e: any) {
 					this.logger.silly(
 						`Action upgrade failed: ${JSON.stringify(action)}(${controlId}) - ${e?.message ?? e} ${e?.stack}`
 					)
@@ -123,18 +124,18 @@ export default class InternalController extends CoreBase {
 	// 		//
 	// 	}
 
-	feedbackUpdate(feedback, controlId: string) {
+	feedbackUpdate(feedback: FeedbackInstance, controlId: string) {
 		if (feedback.instance_id !== 'internal') throw new Error(`Feedback is not for internal instance`)
 		if (feedback.disabled) return
 
 		const parsedId = ParseControlId(controlId)
 
-		const cloned = {
+		const cloned: InternalFeedbackInstance = {
 			...cloneDeep(feedback),
 			controlId,
 			info: {
-				page: parsedId?.page,
-				bank: parsedId?.bank,
+				page: parsedId?.type === 'bank' ? parsedId.page : undefined,
+				bank: parsedId?.type === 'bank' ? parsedId.bank : undefined,
 			},
 		}
 		this.feedbacks.set(feedback.id, cloned)
@@ -149,18 +150,18 @@ export default class InternalController extends CoreBase {
 
 		// TODO - unhandled
 	}
-	feedbackDelete(feedback) {
+	feedbackDelete(feedback: FeedbackInstance) {
 		if (feedback.instance_id !== 'internal') throw new Error(`Feedback is not for internal instance`)
 
 		this.feedbacks.delete(feedback.id)
 	}
-	#feedbackGetValue(feedback) {
+	#feedbackGetValue(feedback: InternalFeedbackInstance) {
 		for (const fragment of this.fragments) {
 			if (typeof fragment.executeFeedback === 'function') {
 				let value
 				try {
 					value = fragment.executeFeedback(feedback)
-				} catch (e) {
+				} catch (e: any) {
 					this.logger.silly(`Feedback check failed: ${JSON.stringify(feedback)} - ${e?.message ?? e} ${e?.stack}`)
 				}
 
@@ -182,7 +183,7 @@ export default class InternalController extends CoreBase {
 						// It was handled, so break
 						return
 					}
-				} catch (e) {
+				} catch (e: any) {
 					this.logger.warn(
 						`Action execute failed: ${JSON.stringify(action)}(${JSON.stringify(extras)}) - ${e?.message ?? e} ${
 							e?.stack
@@ -195,7 +196,7 @@ export default class InternalController extends CoreBase {
 		return false
 	}
 
-	setVariables(variables) {
+	setVariables(variables: CompanionVariableValues) {
 		this.registry.instance.variable.setVariableValues('internal', variables)
 	}
 	checkFeedbacks(...types: string[]) {

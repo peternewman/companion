@@ -1,9 +1,10 @@
 // import type { SomeCompanionActionInputField } from '@companion-module/base'
 import moment from 'moment'
+import { SomeUIInputField } from '../Shared/InputFields'
 
 export interface EventDefinition {
 	name: string
-	options: unknown[]
+	options: SomeUIInputField[]
 }
 
 /**
@@ -48,7 +49,7 @@ export const EventDefinitions: Record<string, EventDefinition> = {
 				label: 'Time',
 				type: 'textinput',
 				placeholder: 'HH:MM:SS',
-				pattern: '(0[0-9]|1[0-9]|2[0-3])(:[0-5][0-9]){2}',
+				regex: '(0[0-9]|1[0-9]|2[0-3])(:[0-5][0-9]){2}',
 				default: '',
 			},
 			{
@@ -110,7 +111,6 @@ export const EventDefinitions: Record<string, EventDefinition> = {
 				type: 'internal:variable',
 				id: 'variableId',
 				label: 'Variable to watch',
-				default: 'internal:time_hms',
 			},
 		],
 	},

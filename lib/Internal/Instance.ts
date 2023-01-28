@@ -15,10 +15,10 @@
  *
  */
 
-import { combineRgb } from '@companion-module/base'
+import { CompanionAdvancedFeedbackResult, combineRgb } from '@companion-module/base'
 import { rgb } from '../Resources/Util.js'
-import { InternalFragment } from './FragmantBase.js'
-import type { ActionInstance, FeedbackInstance, Registry, RunActionExtras, VariableDefinition } from '../tmp.js'
+import { InternalFeedbackInstance, InternalFragment } from './FragmantBase.js'
+import type { ActionInstance, Registry, RunActionExtras, VariableDefinition } from '../tmp.js'
 import type { InstanceStatus } from '../Instance/Status.js'
 import { ActionDefinition, FeedbackDefinition } from '../Instance/Definitions.js'
 
@@ -165,7 +165,7 @@ export default class Instance extends InternalFragment {
 							{ id: 'good', label: 'OK' },
 							{ id: 'warning', label: 'Warning' },
 							{ id: 'error', label: 'Error' },
-							{ id: null, label: 'Disabled' },
+							{ id: null as any, label: 'Disabled' },
 						],
 					},
 				],
@@ -181,7 +181,9 @@ export default class Instance extends InternalFragment {
 		return undefined
 	}
 
-	override executeFeedback(feedback: FeedbackInstance): boolean | undefined {
+	override executeFeedback(
+		feedback: InternalFeedbackInstance
+	): Partial<CompanionAdvancedFeedbackResult> | boolean | undefined {
 		if (feedback.type === 'instance_status') {
 			if (feedback.options.instance_id == 'all') {
 				if (this.instance_errors > 0) {

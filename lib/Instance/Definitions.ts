@@ -13,6 +13,7 @@ import {
 	CompanionButtonPresetDefinition as ModulePresetDefinition,
 } from '@companion-module/base'
 import ControlButtonNormal, { ButtonConfig } from '../Controls/ControlTypes/Button/Normal.js'
+import { SomeUIInputField } from '../Shared/InputFields.js'
 
 const PresetsRoom = 'presets'
 const ActionsRoom = 'action-definitions'
@@ -21,7 +22,7 @@ const FeedbacksRoom = 'feedback-definitions'
 export interface FeedbackDefinition {
 	label: string
 	description?: string
-	options: Array<unknown>
+	options: Array<SomeUIInputField>
 	type: string
 	style?: unknown
 
@@ -30,7 +31,7 @@ export interface FeedbackDefinition {
 export interface ActionDefinition {
 	label: string
 	description?: string
-	options: Array<unknown>
+	options: Array<SomeUIInputField>
 
 	previewControlIdFn?: string
 }

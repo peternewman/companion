@@ -3,7 +3,7 @@ import path from 'path'
 import { cloneDeep } from 'lodash-es'
 import CoreBase from '../Core/Base.js'
 import Registry from '../Registry.js'
-import { showErrorMessage, showFatalError } from '../Resources/Util.js'
+import { showErrorMessage } from '../Resources/Util.js'
 
 /**
  * Abstract class to be extended by the flat file DB classes.
@@ -248,7 +248,7 @@ class DataStoreBase<TStore> extends CoreBase {
 	 * @param {boolean} [clone = false] - <code>true</code> if a clone is needed instead of a link
 	 * @access public
 	 */
-	getKey(key: keyof TStore, defaultValue: any, clone = false) {
+	getKey(key: keyof TStore, defaultValue?: any, clone = false) {
 		let out
 		this.logger.silly(`${this.name}_get(${String(key)})`)
 

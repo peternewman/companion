@@ -87,11 +87,11 @@ export default class ActionRunner extends CoreBase {
 
 	/**
 	 * Abort pending delayed actions for a page
-	 * @param {number} page Page to abort actions for
-	 * @param {string[]} skipControlIds Ids of the controls to skip
+	 * @param page Page to abort actions for
+	 * @param skipControlIds Ids of the controls to skip
 	 * @access public
 	 */
-	abortPageDelayed(page: number, skipControlIds: string[]): void {
+	abortPageDelayed(page: number, skipControlIds: string[] | undefined): void {
 		for (let bank = 1; bank <= MAX_BUTTONS; bank++) {
 			const controlId = CreateBankControlId(page, bank)
 

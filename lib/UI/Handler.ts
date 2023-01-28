@@ -15,13 +15,22 @@
  *
  */
 
-import { Server as _io } from 'socket.io'
+import { Server as IOServer, ServerOptions, Socket } from 'socket.io'
 import LogController from '../Log/Controller.js'
+import { Registry, SocketClient } from '../tmp.js'
+import { Server as httpsServer } from 'https'
+import { Server as httpServer } from 'http'
 
 class UIHandler {
 	logger = LogController.createLogger('UI/Handler')
 
-	constructor(registry, http) {
+	registry: Registry
+	options: Partial<ServerOptions>
+
+	httpIO: IOServer
+	httpsIO: IOServer | undefined
+
+	constructor(registry: Registry, http: httpServer) {
 		this.registry = registry
 
 		this.options = {
@@ -34,7 +43,7 @@ class UIHandler {
 			},
 		}
 
-		this.httpIO = new _io(http, this.options)
+		this.httpIO = new IOServer(http, this.options)
 
 		this.httpIO.on('connect', this.clientConnect.bind(this))
 	}
@@ -44,7 +53,7 @@ class UIHandler {
 	 * @param {SocketIO} client - the client socket
 	 * @access public
 	 */
-	clientConnect(client) {
+	private clientConnect(client: Socket) {
 		this.logger.debug('socket ' + client.id + ' connected')
 
 		client.emit('app-version-info', {
@@ -52,50 +61,56 @@ class UIHandler {
 			appBuild: this.registry.appBuild,
 		})
 
+		const wrapperClient = client as SocketClient // TODO - remove this
+
 		// Wrap all 'client.on' calls, so that we 'handle' any errors they might throw
-		const originalOn = client.on.bind(client)
-		client.on = (name, fcn) => {
-			return originalOn.call(client, name, (...args) => {
+		const originalOn = wrapperClient.on.bind(client)
+		wrapperClient.on = (name, fcn) => {
+			// @ts-expect-error
+			originalOn.call(client, name, (...args: any[]) => {
 				try {
 					fcn(...args)
-				} catch (e) {
+				} catch (e: any) {
 					this.logger.warn(`Error in client handler '${name}': ${e} ${e?.stack}`)
 				}
 			})
+			return wrapperClient
 		}
 		// Provide a promise based 'client.on' method, for methods which want to be promise based.
 		// Note: it expects the last parameter to be the callback
-		client.onPromise = (name, fcn) => {
-			return originalOn.call(client, name, (...args) => {
+		wrapperClient.onPromise = (name, fcn) => {
+			// @ts-expect-error
+			originalOn.call(wrapperClient, name, (...args: any[]) => {
 				Promise.resolve().then(async () => {
 					const cb = args.pop()
 					try {
 						const result = await fcn(...args)
 						cb(null, result)
-					} catch (e) {
+					} catch (e: any) {
 						this.logger.warn(`Error in client handler '${name}': ${e} ${e?.stack}`)
 						if (cb) cb('error', null)
 					}
 				})
 			})
+			return wrapperClient
 		}
 
-		this.registry.log.clientConnect(client)
-		this.registry.ui.clientConnect(client)
-		this.registry.data.clientConnect(client)
-		this.registry.page.clientConnect(client)
-		this.registry.controls.clientConnect(client)
-		this.registry.preview.clientConnect(client)
-		this.registry.surfaces.clientConnect(client)
-		this.registry.instance.clientConnect(client)
-		this.registry.cloud.clientConnect(client)
+		this.registry.log.clientConnect(wrapperClient)
+		this.registry.ui.clientConnect(wrapperClient)
+		this.registry.data.clientConnect(wrapperClient)
+		this.registry.page.clientConnect(wrapperClient)
+		this.registry.controls.clientConnect(wrapperClient)
+		this.registry.preview.clientConnect(wrapperClient)
+		this.registry.surfaces.clientConnect(wrapperClient)
+		this.registry.instance.clientConnect(wrapperClient)
+		this.registry.cloud.clientConnect(wrapperClient)
 
 		client.on('disconnect', () => {
-			this.logger.debug('socket ' + client.id + ' disconnected')
+			this.logger.debug('socket ' + wrapperClient.id + ' disconnected')
 		})
 	}
 
-	emit(...args) {
+	emit(...args: Parameters<IOServer['emit']>) {
 		this.httpIO.emit(...args)
 
 		if (this.httpsIO !== undefined) {
@@ -103,7 +118,7 @@ class UIHandler {
 		}
 	}
 
-	emitToRoom(room, ...args) {
+	emitToRoom(room: string, ...args: Parameters<IOServer['emit']>) {
 		this.httpIO.to(room).emit(...args)
 
 		if (this.httpsIO !== undefined) {
@@ -111,22 +126,22 @@ class UIHandler {
 		}
 	}
 
-	countRoomMembers(room) {
+	countRoomMembers(room: string) {
 		let clientsInRoom = 0
 
 		if (this.httpIO.sockets.adapter.rooms.has(room)) {
-			clientsInRoom += this.httpIO.sockets.adapter.rooms.get(room).size
+			clientsInRoom += this.httpIO.sockets.adapter.rooms.get(room)?.size ?? 0
 		}
 		if (this.httpsIO && this.httpsIO.sockets.adapter.rooms.has(room)) {
-			clientsInRoom += this.httpsIO.sockets.adapter.rooms.get(room).size
+			clientsInRoom += this.httpsIO.sockets.adapter.rooms.get(room)?.size ?? 0
 		}
 
 		return clientsInRoom
 	}
 
-	enableHttps(https) {
+	enableHttps(https: httpsServer | undefined) {
 		if (https !== undefined) {
-			this.httpsIO = new _io(https, this.options)
+			this.httpsIO = new IOServer(https, this.options)
 
 			this.httpsIO.on('connect', this.clientConnect.bind(this))
 		}

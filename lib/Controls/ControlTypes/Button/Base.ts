@@ -341,7 +341,7 @@ export default abstract class ButtonControlBase<TConfigJson, TRuntimeJson, TOpti
 	 * @param {boolean} skip_up Mark the button as released, skipping the release actions
 	 * @access public
 	 */
-	setActionsRunning(running: boolean, skip_up = false) {
+	setActionsRunning(running: boolean, skip_up = false): void {
 		this.has_actions_running = running
 
 		if (skip_up) {
@@ -358,7 +358,7 @@ export default abstract class ButtonControlBase<TConfigJson, TRuntimeJson, TOpti
 	 * @returns {boolean} the pushed state changed
 	 * @access public
 	 */
-	setPushed(direction: boolean, deviceId: string | undefined) {
+	setPushed(direction: boolean, deviceId: string | undefined): boolean {
 		const wasPushed = this.pushed
 		// Record is as pressed
 		this.pushed = !!direction

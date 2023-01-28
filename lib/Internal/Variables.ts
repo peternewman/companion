@@ -17,10 +17,11 @@
 
 import { FeedbackDefinition } from '../Instance/Definitions.js'
 import { rgb } from '../Resources/Util.js'
-import type { FeedbackInstance, Registry } from '../tmp.js'
-import { InternalFragment } from './FragmantBase.js'
+import { UIInputFieldDropdown } from '../Shared/InputFields.js'
+import type { Registry } from '../tmp.js'
+import { InternalFeedbackInstance, InternalFragment } from './FragmantBase.js'
 
-const COMPARISON_OPERATION = {
+const COMPARISON_OPERATION: UIInputFieldDropdown = {
 	type: 'dropdown',
 	label: 'Operation',
 	id: 'op',
@@ -71,7 +72,6 @@ export default class Variables extends InternalFragment {
 						label: 'Variable',
 						tooltip: 'What variable to act on?',
 						id: 'variable',
-						default: 'internal:time_hms',
 					},
 					COMPARISON_OPERATION,
 					{
@@ -105,7 +105,6 @@ export default class Variables extends InternalFragment {
 						label: 'Compare Variable',
 						tooltip: 'What variable to act on?',
 						id: 'variable',
-						default: 'internal:time_hms',
 					},
 					COMPARISON_OPERATION,
 					{
@@ -113,7 +112,6 @@ export default class Variables extends InternalFragment {
 						label: 'Against Variable',
 						tooltip: 'What variable to compare with?',
 						id: 'variable2',
-						default: 'internal:time_hms',
 					},
 				],
 				// subscribe: (fb) => {
@@ -155,7 +153,7 @@ export default class Variables extends InternalFragment {
 		}
 	}
 
-	override executeFeedback(feedback: FeedbackInstance): boolean | undefined {
+	override executeFeedback(feedback: InternalFeedbackInstance): boolean | undefined {
 		if (feedback.type == 'variable_value') {
 			const value = this.instance.variable.parseVariables(`$(${feedback.options.variable})`).text
 

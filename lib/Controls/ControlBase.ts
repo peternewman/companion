@@ -71,6 +71,13 @@ export interface ControlBaseWithEvents {
 
 export interface ControlBaseWithSteps {
 	/**
+	 * Get the index of the current (next to execute) step
+	 * @returns {number} The index of current step
+	 * @access public
+	 */
+	getActiveStepIndex(): number | undefined
+
+	/**
 	 * Add a step to this control
 	 * @returns {boolean} success
 	 * @access public
@@ -117,6 +124,12 @@ export interface ControlBaseWithSteps {
 	 * @access public
 	 */
 	stepSwap(stepId1: string, stepId2: string): boolean
+
+	// TODO
+	pushed: boolean
+	setPushed(direction: boolean, deviceId: string | undefined): boolean
+
+	setActionsRunning(running: boolean, skip_up: boolean): void
 }
 export interface ControlBaseWithDynamicActionSets {
 	/**

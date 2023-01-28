@@ -15,11 +15,12 @@
  *
  */
 
+import ControlTrigger from '../Controls/ControlTypes/Triggers/Trigger.js'
 import { ActionDefinition, FeedbackDefinition } from '../Instance/Definitions.js'
 import { rgb } from '../Resources/Util.js'
 import { ParseControlId } from '../Shared/ControlId.js'
-import type { ActionInstance, FeedbackInstance, Registry, RunActionExtras } from '../tmp.js'
-import { InternalFragment } from './FragmantBase.js'
+import type { ActionInstance, Registry, RunActionExtras } from '../tmp.js'
+import { InternalFeedbackInstance, InternalFragment } from './FragmantBase.js'
 
 export default class Triggers extends InternalFragment {
 	constructor(registry: Registry) {
@@ -62,7 +63,7 @@ export default class Triggers extends InternalFragment {
 		if (action.action === 'trigger_enabled') {
 			const parsedControlId = ParseControlId(action.options.trigger_id)
 			if (parsedControlId?.type === 'trigger') {
-				const control = this.controls.getControl(action.options.trigger_id)
+				const control = this.controls.getControl(action.options.trigger_id) as ControlTrigger | undefined
 				if (!control) return false
 
 				let newState = action.options.enable == 'true'
@@ -106,11 +107,11 @@ export default class Triggers extends InternalFragment {
 		}
 	}
 
-	override executeFeedback(feedback: FeedbackInstance): boolean | undefined {
+	override executeFeedback(feedback: InternalFeedbackInstance): boolean | undefined {
 		if (feedback.type === 'trigger_enabled') {
 			const parsedControlId = ParseControlId(feedback.options.trigger_id)
 			if (parsedControlId?.type === 'trigger') {
-				const control = this.controls.getControl(feedback.options.trigger_id)
+				const control = this.controls.getControl(feedback.options.trigger_id) as ControlTrigger | undefined
 				if (!control) return false
 
 				const state = control.options.enabled

@@ -1,6 +1,5 @@
 import { HAlignment, VAlignment } from '../Graphics/Image.js'
-import Registry from '../Registry.js'
-import { ButtonStyle } from '../tmp.js'
+import type { Registry, ButtonStyle } from '../tmp.js'
 import { MAX_BUTTONS, MAX_BUTTONS_PER_ROW } from './Constants.js'
 
 export function argb(

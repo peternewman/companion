@@ -15,15 +15,24 @@
  *
  */
 
-import { serializeIsVisibleFn } from '@companion-module/base/dist/internal/base.js'
 import { cloneDeep } from 'lodash-es'
 import { SplitVariableId, rgb } from '../Resources/Util.js'
-import { CreateBankControlId } from '../Shared/ControlId.js'
-import { ActionInstance, FeedbackInstance, Registry, RunActionExtras } from '../tmp.js'
-import { InternalFragment } from './FragmantBase.js'
+import { CreateBankControlId, ParsedBankId } from '../Shared/ControlId.js'
+import { ActionInstance, Registry, RunActionExtras } from '../tmp.js'
+import { InternalFeedbackInstance, InternalFragment } from './FragmantBase.js'
 import { ActionDefinition, FeedbackDefinition } from '../Instance/Definitions.js'
+import { CompanionAdvancedFeedbackResult, CompanionOptionValues } from '@companion-module/base'
+import {
+	SomeUIInputField,
+	UIInputFieldCheckbox,
+	UIInputFieldInternalBank,
+	UIInputFieldInternalPage,
+	UIInputFieldTextInput,
+	serializeIsVisibleFn,
+} from '../Shared/InputFields.js'
+import { ControlBaseWithSteps } from '../Controls/ControlBase.js'
 
-const previewControlIdFn = ((options, info) => {
+const previewControlIdFn = ((options: CompanionOptionValues, info: ParsedBankId | undefined) => {
 	// Note: this is manual, but it can't depend on other functions
 
 	// Can't handle variables
@@ -39,61 +48,61 @@ const previewControlIdFn = ((options, info) => {
 
 	return `bank:${thePage}-${theButton}`
 }).toString()
-const CHOICES_PAGE = {
+const CHOICES_PAGE: UIInputFieldInternalPage = {
 	type: 'internal:page',
 	label: 'Page',
 	id: 'page',
 	includeDirection: true,
 	default: 0,
 }
-const CHOICES_PAGE_WITH_VARIABLES = serializeIsVisibleFn([
+const CHOICES_PAGE_WITH_VARIABLES: SomeUIInputField[] = [
 	{
 		type: 'checkbox',
 		label: 'Use variables for page',
 		id: 'page_from_variable',
 		default: false,
-	},
+	} satisfies UIInputFieldCheckbox,
 	{
 		...CHOICES_PAGE,
-		isVisible: (options) => !options.page_from_variable,
+		isVisibleFn: serializeIsVisibleFn((options) => !options.page_from_variable),
 	},
 	{
 		type: 'textinput',
 		label: 'Page (expression)',
 		id: 'page_variable',
 		default: '1',
-		isVisible: (options) => !!options.page_from_variable,
+		isVisibleFn: serializeIsVisibleFn((options) => !!options.page_from_variable),
 		useVariables: true,
-	},
-])
+	} satisfies UIInputFieldTextInput,
+]
 
-const CHOICES_BUTTON = {
+const CHOICES_BUTTON: UIInputFieldInternalBank = {
 	type: 'internal:bank',
 	label: 'Button',
 	tooltip: 'Which Button?',
 	id: 'bank',
 	default: 0,
 }
-const CHOICES_BUTTON_WITH_VARIABLES = serializeIsVisibleFn([
+const CHOICES_BUTTON_WITH_VARIABLES: SomeUIInputField[] = [
 	{
 		type: 'checkbox',
 		label: 'Use variables for button',
 		id: 'bank_from_variable',
 		default: false,
-	},
+	} satisfies UIInputFieldCheckbox,
 	{
 		...CHOICES_BUTTON,
-		isVisible: (options) => !options.bank_from_variable,
+		isVisibleFn: serializeIsVisibleFn((options) => !options.bank_from_variable),
 	},
 	{
 		type: 'textinput',
 		label: 'Button (expression)',
 		id: 'bank_variable',
 		default: '1',
-		isVisible: (options) => !!options.bank_from_variable,
+		isVisibleFn: serializeIsVisibleFn((options) => !!options.bank_from_variable),
 		useVariables: true,
-	},
-])
+	} satisfies UIInputFieldTextInput,
+]
 
 export default class Controls extends InternalFragment {
 	constructor(registry: Registry) {
@@ -109,7 +118,7 @@ export default class Controls extends InternalFragment {
 		})
 	}
 
-	#fetchPageAndButton(options: Record<string, any>, info, useVariableFields: boolean) {
+	#fetchPageAndButton(options: Record<string, any>, info, useVariableFields?: boolean) {
 		let thePage = options.page
 		let theButton = options.bank
 
@@ -181,7 +190,6 @@ export default class Controls extends InternalFragment {
 						type: 'internal:variable',
 						id: 'variable',
 						label: 'Variable to check',
-						default: 'internal:time_hms',
 					},
 					{
 						type: 'dropdown',
@@ -259,7 +267,7 @@ export default class Controls extends InternalFragment {
 						type: 'colorpicker',
 						label: 'Text Color',
 						id: 'color',
-						default: '0',
+						default: 0,
 					},
 					...CHOICES_PAGE_WITH_VARIABLES,
 					...CHOICES_BUTTON_WITH_VARIABLES,
@@ -273,7 +281,7 @@ export default class Controls extends InternalFragment {
 						type: 'colorpicker',
 						label: 'Background Color',
 						id: 'color',
-						default: '0',
+						default: 0,
 					},
 					...CHOICES_PAGE_WITH_VARIABLES,
 					...CHOICES_BUTTON_WITH_VARIABLES,
@@ -399,9 +407,11 @@ export default class Controls extends InternalFragment {
 		}
 	}
 
-	override executeFeedback(feedback: FeedbackInstance): boolean | undefined {
+	override executeFeedback(
+		feedback: InternalFeedbackInstance
+	): Partial<CompanionAdvancedFeedbackResult> | boolean | undefined {
 		if (feedback.type === 'bank_style') {
-			const { thePage, theButton, theControlId } = this.#fetchPageAndButton(feedback.options, feedback.info)
+			const { thePage, theButton, theControlId } = this.#fetchPageAndButton(feedback.options, feedback.info, false)
 
 			if (!thePage || !theButton || theControlId === feedback.controlId) {
 				// Don't recurse on self
@@ -435,13 +445,14 @@ export default class Controls extends InternalFragment {
 			const { theControlId } = this.#fetchPageAndButton(feedback.options, feedback.info)
 			const theStep = feedback.options.step
 
-			const control = this.controls.getControl(theControlId)
+			const control = this.controls.getControl(theControlId) as Partial<ControlBaseWithSteps> | undefined
 			if (control && typeof control.getActiveStepIndex === 'function') {
-				return control.getActiveStepIndex() + 1 === theStep
+				return (control.getActiveStepIndex() ?? 0) + 1 === theStep
 			} else {
 				return false
 			}
 		}
+		return undefined
 	}
 
 	override executeAction(action: ActionInstance, extras: RunActionExtras): boolean | undefined {
@@ -596,5 +607,6 @@ export default class Controls extends InternalFragment {
 				control.stepAdvanceDelta(action.options.amount)
 			}
 		}
+		return undefined
 	}
 }

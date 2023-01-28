@@ -15,13 +15,21 @@
  *
  */
 
-import { combineRgb } from '@companion-module/base'
-import { serializeIsVisibleFn } from '@companion-module/base/dist/internal/base.js'
-import { InternalFragment } from './FragmantBase.js'
-import type { ActionInstance, FeedbackInstance, Registry, RunActionExtras, VariableDefinition } from '../tmp.js'
+import { CompanionOptionValues, combineRgb } from '@companion-module/base'
+import { InternalFeedbackInstance, InternalFragment } from './FragmantBase.js'
+import type { ActionInstance, Registry, RunActionExtras, VariableDefinition } from '../tmp.js'
 import { ActionDefinition, FeedbackDefinition } from '../Instance/Definitions.js'
+import {
+	SomeUIInputField,
+	UIInputFieldCheckbox,
+	UIInputFieldInternalPage,
+	UIInputFieldInternalSurfaceSerial,
+	UIInputFieldNumber,
+	UIInputFieldTextInput,
+	serializeIsVisibleFn,
+} from '../Shared/InputFields.js'
 
-const CHOICES_CONTROLLER = {
+const CHOICES_CONTROLLER: UIInputFieldInternalSurfaceSerial = {
 	type: 'internal:surface_serial',
 	label: 'Surface / controller',
 	id: 'controller',
@@ -29,51 +37,51 @@ const CHOICES_CONTROLLER = {
 	includeSelf: true,
 }
 
-const CHOICES_CONTROLLER_WITH_VARIABLES = serializeIsVisibleFn([
+const CHOICES_CONTROLLER_WITH_VARIABLES: SomeUIInputField[] = [
 	{
 		type: 'checkbox',
 		label: 'Use variables for surface',
 		id: 'controller_from_variable',
 		default: false,
-	},
+	} satisfies UIInputFieldCheckbox,
 	{
 		...CHOICES_CONTROLLER,
-		isVisible: (options) => !options.controller_from_variable,
+		isVisibleFn: serializeIsVisibleFn((options) => !options.controller_from_variable),
 	},
 	{
 		type: 'textinput',
 		label: 'Surface / controller',
 		id: 'controller_variable',
 		default: 'self',
-		isVisible: (options) => !!options.controller_from_variable,
+		isVisibleFn: serializeIsVisibleFn((options) => !!options.controller_from_variable),
 		useVariables: true,
-	},
-])
+	} satisfies UIInputFieldTextInput,
+]
 
-const CHOICES_PAGE_WITH_VARIABLES = serializeIsVisibleFn([
+const CHOICES_PAGE_WITH_VARIABLES: SomeUIInputField[] = [
 	{
 		type: 'checkbox',
 		label: 'Use variables for page',
 		id: 'page_from_variable',
 		default: false,
-	},
+	} satisfies UIInputFieldCheckbox,
 	{
 		type: 'internal:page',
 		label: 'Page',
 		id: 'page',
 		includeDirection: true,
 		default: 0,
-		isVisible: (options) => !options.page_from_variable,
-	},
+		isVisibleFn: serializeIsVisibleFn((options: CompanionOptionValues) => !options.page_from_variable),
+	} satisfies UIInputFieldInternalPage,
 	{
 		type: 'textinput',
 		label: 'Page (expression)',
 		id: 'page_variable',
 		default: '1',
-		isVisible: (options) => !!options.page_from_variable,
+		isVisibleFn: serializeIsVisibleFn((options) => !!options.page_from_variable),
 		useVariables: true,
-	},
-])
+	} satisfies UIInputFieldTextInput,
+]
 
 export default class Surface extends InternalFragment {
 	/** Page history for surfaces */
@@ -97,7 +105,7 @@ export default class Surface extends InternalFragment {
 		})
 	}
 
-	#fetchControllerId(options: Record<string, any>, info, useVariableFields: boolean) {
+	#fetchControllerId(options: Record<string, any>, info: InternalFeedbackInstance['info'], useVariableFields: boolean) {
 		let theController = options.controller
 
 		if (useVariableFields && options.controller_from_variable) {
@@ -111,7 +119,7 @@ export default class Surface extends InternalFragment {
 		return theController
 	}
 
-	#fetchPage(options: Record<string, any>, info, useVariableFields: boolean) {
+	#fetchPage(options: Record<string, any>, info: InternalFeedbackInstance['info'], useVariableFields: boolean) {
 		let thePage = options.page
 
 		if (useVariableFields && options.page_from_variable) {
@@ -169,7 +177,7 @@ export default class Surface extends InternalFragment {
 						max: 100,
 						step: 1,
 						range: true,
-					},
+					} satisfies UIInputFieldNumber,
 				],
 			},
 
@@ -316,7 +324,7 @@ export default class Surface extends InternalFragment {
 			}
 			return true
 		} else if (action.action === 'rescan') {
-			this.surfaces.triggerRefreshDevices().catch((e) => {
+			this.surfaces.triggerRefreshDevices().catch(() => {
 				// TODO
 			})
 			return true
@@ -417,7 +425,7 @@ export default class Surface extends InternalFragment {
 		}
 	}
 
-	override executeFeedback(feedback: FeedbackInstance): boolean | undefined {
+	override executeFeedback(feedback: InternalFeedbackInstance): boolean | undefined {
 		if (feedback.type == 'surface_on_page') {
 			const theController = this.#fetchControllerId(feedback.options, feedback.info, false)
 			const thePage = this.#fetchPage(feedback.options, feedback.info, false)

@@ -556,7 +556,7 @@ export default class ControlTrigger
 	 * Update an option field of this control
 	 * @access public
 	 */
-	optionsSetField<K extends keyof TriggerOptions>(key: K, value: TriggerOptions[K], forceSet: boolean): boolean {
+	optionsSetField<K extends keyof TriggerOptions>(key: K, value: TriggerOptions[K], forceSet = false): boolean {
 		if (!forceSet && key === 'sortOrder') throw new Error('sortOrder cannot be set by the client')
 
 		this.options[key] = value

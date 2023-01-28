@@ -76,7 +76,6 @@ export default class CustomVariables extends InternalFragment {
 						id: 'variable',
 						label: 'Variable to store value from',
 						tooltip: 'What variable to store in the custom variable?',
-						default: 'internal:time_hms',
 					},
 				],
 			},
@@ -108,7 +107,6 @@ export default class CustomVariables extends InternalFragment {
 						type: 'internal:variable',
 						label: 'Variable',
 						id: 'variable',
-						default: 'internal:time_hms',
 					},
 					{
 						type: 'dropdown',
@@ -145,7 +143,6 @@ export default class CustomVariables extends InternalFragment {
 						type: 'internal:variable',
 						label: 'Variable',
 						id: 'variable',
-						default: 'internal:time_hms',
 					},
 					{
 						type: 'number',
@@ -171,7 +168,6 @@ export default class CustomVariables extends InternalFragment {
 						type: 'internal:variable',
 						label: 'Variable',
 						id: 'variable',
-						default: 'internal:time_hms',
 					},
 					{
 						type: 'internal:custom_variable',
@@ -187,7 +183,6 @@ export default class CustomVariables extends InternalFragment {
 						type: 'internal:variable',
 						label: 'Variable',
 						id: 'variable',
-						default: 'internal:time_hms',
 					},
 					{
 						type: 'textinput',
@@ -220,7 +215,6 @@ export default class CustomVariables extends InternalFragment {
 						type: 'internal:variable',
 						label: 'Variable',
 						id: 'variable',
-						default: 'internal:time_hms',
 					},
 					{
 						type: 'textinput',
@@ -268,7 +262,7 @@ export default class CustomVariables extends InternalFragment {
 			let objJson = ''
 			try {
 				objJson = JSON.parse(jsonResultData)
-			} catch (e) {
+			} catch (e: any) {
 				this.logger.error(
 					`custom_variable_set_via_jsonpath: Cannot create JSON object, malformed JSON data (${e.message})`
 				)
@@ -278,17 +272,17 @@ export default class CustomVariables extends InternalFragment {
 			// extract the value via the given standard JSONPath expression
 			let valueToSet = ''
 			try {
-				valueToSet = JSONPath(action.options.jsonPath, objJson)
-			} catch (e) {
+				valueToSet = JSONPath(action.options.jsonPath, objJson, undefined, undefined)
+			} catch (e: any) {
 				this.logger.error(`custom_variable_set_via_jsonpath: Cannot extract JSON value (${e.message})`)
 				return
 			}
 
 			try {
 				if (typeof valueToSet !== 'number' && typeof valueToSet !== 'string' && valueToSet) {
-					valueToSet = JSON.stringify(valueToSet)
+					valueToSet = JSON.stringify(valueToSet) as any
 				}
-			} catch (e) {
+			} catch (e: any) {
 				this.logger.error(`custom_variable_set_via_jsonpath: Cannot stringify JSON value (${e.message})`)
 				return
 			}
@@ -362,5 +356,6 @@ export default class CustomVariables extends InternalFragment {
 
 			this.instance.variable.custom.setValue(action.options.result, value)
 		}
+		return undefined
 	}
 }
