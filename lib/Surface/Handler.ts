@@ -15,14 +15,50 @@
  *
  */
 
+import { cloneDeep } from 'lodash-es'
 import CoreBase from '../Core/Base.js'
+import { MAX_BUTTONS, MAX_BUTTONS_PER_ROW } from '../Resources/Constants.js'
 import { toDeviceKey, toGlobalKey } from '../Resources/Util.js'
 import { CreateBankControlId } from '../Shared/ControlId.js'
+import { Complete, Registry } from '../tmp.js'
+import { ISurface, SurfaceConfig } from './info.js'
+
+export interface SurfaceConfigExt extends SurfaceConfig {
+	use_last_page: boolean
+	page: number
+	xOffset: number
+	yOffset: number
+}
+
+export interface SurfaceDbConfig {
+	name: string
+	config: SurfaceConfigExt
+
+	page: number
+
+	type: string | undefined
+	integrationType: string | undefined
+}
 
 const PINCODE_NUMBER_POSITIONS = [12, 17, 18, 19, 9, 10, 11, 1, 2, 3]
 const PINCODE_CODE_POSITION = 8
 
 class SurfaceHandler extends CoreBase {
+	static DefaultSurfaceConfig: Complete<SurfaceConfigExt> = {
+		// defaults from the panel - TODO properly
+		brightness: 100,
+		rotation: 0,
+
+		emulator_control_enable: true,
+		emulator_prompt_fullscreen: true,
+
+		// companion owned defaults
+		use_last_page: true,
+		page: 1,
+		xOffset: 0,
+		yOffset: 0,
+	}
+
 	/**
 	 * Current pincode entry if locked
 	 */
@@ -56,23 +92,29 @@ class SurfaceHandler extends CoreBase {
 	 */
 	#xkeysPageCount = 0
 
-	constructor(registry, integrationType, panel) {
+	panel: ISurface
+
+	currentPage = 1
+	lastpress = -1
+	lastpage = 0
+
+	timeoutTimer: NodeJS.Timer
+
+	panelconfig: SurfaceDbConfig
+
+	constructor(registry: Registry, integrationType: string, panel: ISurface) {
 		super(registry, `device(${panel.info.deviceId})`, `Surface/Handler/${panel.info.deviceId}`)
 		this.logger.silly('loading for ' + panel.info.devicepath)
 
 		this.panel = panel
-		this.isSurfaceLocked = this.userconfig.getKey('pin_enable')
-
-		this.currentPage = 1 // The current page of the device
-		this.lastpress = ''
-		this.lastpage = 0
+		this.isSurfaceLocked = !!this.userconfig.getKey('pin_enable')
 
 		// Fill in max offsets
 		const keysPerRow = this.panel.info.keysPerRow || 0
 		const keysTotal = this.panel.info.keysTotal || 0
 		if (keysPerRow && keysTotal) {
-			const maxRows = Math.ceil(global.MAX_BUTTONS / global.MAX_BUTTONS_PER_ROW)
-			this.panelInfo.xOffsetMax = Math.max(Math.floor(global.MAX_BUTTONS_PER_ROW - keysPerRow), 0)
+			const maxRows = Math.ceil(MAX_BUTTONS / MAX_BUTTONS_PER_ROW)
+			this.panelInfo.xOffsetMax = Math.max(Math.floor(MAX_BUTTONS_PER_ROW - keysPerRow), 0)
 			this.panelInfo.yOffsetMax = Math.max(Math.floor(maxRows - Math.ceil(keysTotal / keysPerRow)), 0)
 		}
 
@@ -80,7 +122,15 @@ class SurfaceHandler extends CoreBase {
 			const rawConfig = this.db.getKey('deviceconfig', {})
 			this.panelconfig = rawConfig[this.deviceId]
 			if (!this.panelconfig) {
-				this.panelconfig = {}
+				this.panelconfig = {
+					name: '',
+					config: cloneDeep(SurfaceHandler.DefaultSurfaceConfig),
+
+					page: 1,
+
+					type: undefined,
+					integrationType: undefined,
+				}
 				this.logger.silly(`Creating config for newly discovered device ${this.deviceId}`)
 
 				rawConfig[this.deviceId] = this.panelconfig
@@ -95,17 +145,7 @@ class SurfaceHandler extends CoreBase {
 		this.panelconfig.integrationType = integrationType
 
 		if (!this.panelconfig.config) {
-			this.panelconfig.config = {
-				// defaults from the panel - TODO properly
-				brightness: 100,
-				rotation: 0,
-
-				// companion owned defaults
-				use_last_page: true,
-				page: 1,
-				xOffset: 0,
-				yOffset: 0,
-			}
+			this.panelconfig.config = cloneDeep(SurfaceHandler.DefaultSurfaceConfig)
 		}
 
 		if (this.panelconfig.config.xOffset === undefined || this.panelconfig.config.yOffset === undefined) {
@@ -224,9 +264,9 @@ class SurfaceHandler extends CoreBase {
 				const xOffset = Math.min(Math.max(this.panelconfig.config.xOffset || 0, 0), this.panelInfo.xOffsetMax)
 				const yOffset = Math.min(Math.max(this.panelconfig.config.yOffset || 0, 0), this.panelInfo.yOffsetMax)
 
-				for (let i = 0; i < global.MAX_BUTTONS; ++i) {
+				for (let i = 0; i < MAX_BUTTONS; ++i) {
 					// Note: the maths looks inverted, but it goes through the toDeviceKey still
-					const key = i - xOffset - yOffset * global.MAX_BUTTONS_PER_ROW
+					const key = i - xOffset - yOffset * MAX_BUTTONS_PER_ROW
 
 					const image = this.graphics.getBank(this.currentPage, i + 1)
 					this.#drawButton(key, image.buffer, image.style)
@@ -235,7 +275,7 @@ class SurfaceHandler extends CoreBase {
 		}
 	}
 
-	#drawButton(key, buffer, style) {
+	#drawButton(key: number, buffer: Buffer | undefined, style): void {
 		const localKey = toDeviceKey(this.panel.info.keysTotal, this.panel.info.keysPerRow, key)
 		if (localKey >= 0 && localKey < this.panel.info.keysTotal) {
 			this.panel.draw(localKey, buffer, style)
@@ -250,11 +290,11 @@ class SurfaceHandler extends CoreBase {
 		return this.panelInfo
 	}
 
-	setLocked(locked) {
+	setLocked(locked: boolean): void {
 		if (!locked) {
 			// Reset timers for next auto-lock
 			this.lastInteraction = Date.now()
-			this.lockSurfaceAt = this.userconfig.getKey('pin_timeout') * 1000 + Date.now()
+			this.lockSurfaceAt = Number(this.userconfig.getKey('pin_timeout')) * 1000 + Date.now()
 		}
 
 		// If it changed, redraw
@@ -265,14 +305,14 @@ class SurfaceHandler extends CoreBase {
 		}
 	}
 
-	onBankInvalidated(page, bank, render) {
+	onBankInvalidated(page: number, bank: number, render) {
 		// If device is locked ignore updates. pincode updates are handled separately
 		if (this.isSurfaceLocked) return
 
 		if (this.#xkeysPageCount > 0) {
 			// xkeys mode
 			const pageOffset = page - this.currentPage
-			if (pageOffset >= 0 && pageOffset < this.#xkeysPageCount) {
+			if (this.panel.xkeysDraw && pageOffset >= 0 && pageOffset < this.#xkeysPageCount) {
 				this.panel.xkeysDraw(pageOffset, bank, render.style?.bgcolor || 0)
 			}
 		} else if (page == this.currentPage) {
@@ -281,13 +321,13 @@ class SurfaceHandler extends CoreBase {
 			const yOffset = Math.min(Math.max(this.panelconfig.config.yOffset || 0, 0), this.panelInfo.yOffsetMax)
 
 			// Note: the maths looks inverted, but it goes through the toDeviceKey still
-			const key = bank - 1 - xOffset - yOffset * global.MAX_BUTTONS_PER_ROW
+			const key = bank - 1 - xOffset - yOffset * MAX_BUTTONS_PER_ROW
 
 			this.#drawButton(key, render.buffer, render.style)
 		}
 	}
 
-	setBrightness(brightness) {
+	setBrightness(brightness: number): void {
 		if (this.panel) {
 			if (this.panel.setConfig) {
 				const config = {
@@ -302,26 +342,26 @@ class SurfaceHandler extends CoreBase {
 		}
 	}
 
-	onDeviceRemove() {
+	onDeviceRemove(): void {
 		if (this.panel) {
 			this.surfaces.removeDevice(this.panel.info.devicepath)
 		}
 	}
 
-	onDeviceClick(key, pressed, pageOffset) {
+	onDeviceClick(key: number, pressed: boolean, pageOffset?: number): void {
 		if (this.panel) {
 			key = toGlobalKey(this.panel.info.keysPerRow, key)
 
 			if (!this.isSurfaceLocked) {
 				this.lastInteraction = Date.now()
-				this.lockSurfaceAt = this.userconfig.getKey('pin_timeout') * 1000 + Date.now()
+				this.lockSurfaceAt = Number(this.userconfig.getKey('pin_timeout')) * 1000 + Date.now()
 
 				// Translate key for offset
 				const xOffset = Math.min(Math.max(this.panelconfig.config.xOffset || 0, 0), this.panelInfo.xOffsetMax)
 				const yOffset = Math.min(Math.max(this.panelconfig.config.yOffset || 0, 0), this.panelInfo.yOffsetMax)
 
 				// Note: the maths looks inverted, but its already been through toGlobalKey
-				key = parseInt(key) + xOffset + yOffset * global.MAX_BUTTONS_PER_ROW
+				key = Number(key) + xOffset + yOffset * MAX_BUTTONS_PER_ROW
 
 				let thisPage = this.currentPage
 
@@ -334,9 +374,9 @@ class SurfaceHandler extends CoreBase {
 					// page changed on this device before button released
 					// release the old page+bank
 					thisPage = this.lastpage
-					this.lastpress = ''
+					this.lastpress = -1
 				} else {
-					this.lastpress = ''
+					this.lastpress = -1
 				}
 
 				// allow the xkeys to span pages
@@ -356,7 +396,7 @@ class SurfaceHandler extends CoreBase {
 						this.isSurfaceLocked = false
 						this.currentPincodeEntry = ''
 						this.lastInteraction = Date.now()
-						this.lockSurfaceAt = this.userconfig.getKey('pin_timeout') * 1000 + Date.now()
+						this.lockSurfaceAt = Number(this.userconfig.getKey('pin_timeout')) * 1000 + Date.now()
 
 						this.drawPage()
 
@@ -377,20 +417,20 @@ class SurfaceHandler extends CoreBase {
 		}
 	}
 
-	onDeviceRotate(key, direction, pageOffset) {
+	onDeviceRotate(key: number, direction: boolean, pageOffset: number): void {
 		if (this.panel) {
 			key = toGlobalKey(this.panel.info.keysPerRow, key)
 
 			if (!this.isSurfaceLocked) {
 				this.lastInteraction = Date.now()
-				this.lockSurfaceAt = this.userconfig.getKey('pin_timeout') * 1000 + Date.now()
+				this.lockSurfaceAt = Number(this.userconfig.getKey('pin_timeout')) * 1000 + Date.now()
 
 				// Translate key for offset
 				const xOffset = Math.min(Math.max(this.panelconfig.config.xOffset || 0, 0), this.panelInfo.xOffsetMax)
 				const yOffset = Math.min(Math.max(this.panelconfig.config.yOffset || 0, 0), this.panelInfo.yOffsetMax)
 
 				// Note: the maths looks inverted, but its already been through toGlobalKey
-				key = parseInt(key) + xOffset + yOffset * global.MAX_BUTTONS_PER_ROW
+				key = Number(key) + xOffset + yOffset * MAX_BUTTONS_PER_ROW
 
 				let thisPage = this.currentPage
 
@@ -420,15 +460,17 @@ class SurfaceHandler extends CoreBase {
 		}
 	}
 
-	onXkeysSubscribePages(pageCount) {
+	onXkeysSubscribePages(pageCount: number): void {
 		this.#xkeysPageCount = pageCount
 
 		this.#xkeysDrawPages()
 	}
 
-	#xkeysDrawPages() {
+	#xkeysDrawPages(): void {
+		if (!this.panel.xkeysDraw) return
+
 		for (let page = 0; page < this.#xkeysPageCount; page++) {
-			for (let bank = 0; bank < global.MAX_BUTTONS; bank++) {
+			for (let bank = 0; bank < MAX_BUTTONS; bank++) {
 				const render = this.graphics.getBank(this.currentPage + page, bank)
 
 				this.panel.xkeysDraw(page, bank, render.style?.bgcolor || 0)
@@ -436,13 +478,13 @@ class SurfaceHandler extends CoreBase {
 		}
 	}
 
-	onXkeysSetVariable(name, value) {
+	onXkeysSetVariable(name: string, value: number) {
 		this.instance.variable.setVariableValues('internal', {
 			[name]: value,
 		})
 	}
 
-	doPageDown() {
+	doPageDown(): void {
 		if (this.userconfig.getKey('page_direction_flipped') === true) {
 			this.#deviceIncreasePage()
 		} else {
@@ -450,7 +492,7 @@ class SurfaceHandler extends CoreBase {
 		}
 	}
 
-	setCurrentPage(page) {
+	setCurrentPage(page: number): void {
 		this.currentPage = page
 		if (this.currentPage == 100) {
 			this.currentPage = 1
@@ -461,11 +503,11 @@ class SurfaceHandler extends CoreBase {
 		this.#storeNewDevicePage(this.currentPage)
 	}
 
-	getCurrentPage() {
+	getCurrentPage(): number {
 		return this.currentPage
 	}
 
-	doPageUp() {
+	doPageUp(): void {
 		if (this.userconfig.getKey('page_direction_flipped') === true) {
 			this.#deviceDecreasePage()
 		} else {
@@ -473,13 +515,13 @@ class SurfaceHandler extends CoreBase {
 		}
 	}
 
-	saveConfig() {
+	saveConfig(): void {
 		const deviceConfig = this.db.getKey('deviceconfig', {})
 		deviceConfig[this.deviceId] = this.panelconfig
 		this.db.setKey('deviceconfig', deviceConfig)
 	}
 
-	setPanelConfig(newconfig) {
+	setPanelConfig(newconfig: SurfaceConfigExt): void {
 		if (!newconfig.use_last_page && newconfig.page !== undefined && newconfig.page !== this.panelconfig.config.page) {
 			// Startup page has changed, so change over to it
 			this.#storeNewDevicePage(newconfig.page)
@@ -502,7 +544,7 @@ class SurfaceHandler extends CoreBase {
 		}
 	}
 
-	setPanelName(newname) {
+	setPanelName(newname: string): void {
 		if (typeof newname === 'string') {
 			this.panelconfig.name = newname
 
@@ -511,7 +553,7 @@ class SurfaceHandler extends CoreBase {
 		}
 	}
 
-	#storeNewDevicePage(newpage) {
+	#storeNewDevicePage(newpage: number): void {
 		this.panelconfig.page = this.currentPage = newpage
 		this.saveConfig()
 
@@ -520,7 +562,7 @@ class SurfaceHandler extends CoreBase {
 		this.drawPage()
 	}
 
-	unload(purge) {
+	unload(purge?: boolean): void {
 		clearInterval(this.timeoutTimer)
 
 		this.logger.error(this.panel.info.type + ' disconnected')
@@ -533,11 +575,11 @@ class SurfaceHandler extends CoreBase {
 
 		const deviceId = this.deviceId
 
-		delete this.panel.device
-		delete this.panel
+		// delete this.panel.device
+		// delete this.panel
 
 		if (purge && deviceId) {
-			this.panelconfig = undefined
+			// this.panelconfig = undefined
 
 			const deviceConfig = this.db.getKey('deviceconfig', {})
 			delete deviceConfig[deviceId]

@@ -18,6 +18,7 @@ import type PageController from './Page/Controller'
 import type GraphicsPreview from './Graphics/Preview'
 import type ServiceController from './Service/Controller'
 import type SurfaceController from './Surface/Controller'
+import EventEmitter from 'events'
 
 /**
  * Make all optional properties be required and `| undefined`
@@ -30,7 +31,7 @@ export type Complete<T> = {
 /**
  * HACK: temporary
  */
-export interface Registry {
+export interface Registry extends EventEmitter {
 	configDir: string
 	machineId: string
 	appVersion: string

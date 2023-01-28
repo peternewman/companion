@@ -17,13 +17,24 @@
 
 import LogController from '../../Log/Controller.js'
 import { rotateBuffer } from '../../Resources/Util.js'
-import { EventEmitter } from 'events'
+import { EventEmitter } from 'eventemitter3'
 import { CreateBankControlId } from '../../Shared/ControlId.js'
+import { Registry } from '../../tmp.js'
+import ControlsController from '../../Controls/Controller.js'
+import { SurfaceInfo, SurfaceConfig, ISurface, ISurfaceEvents } from '../info.js'
+import { MAX_BUTTONS } from '../../Resources/Constants.js'
 
-class SurfaceIPElgatoPlugin extends EventEmitter {
+class SurfaceIPElgatoPlugin extends EventEmitter<ISurfaceEvents> implements ISurface {
 	logger = LogController.createLogger('Surface/IP/ElgatoPlugin')
 
-	constructor(registry, devicepath, socket) {
+	private controls: ControlsController
+
+	socket: unknown
+
+	info: SurfaceInfo
+	_config: SurfaceConfig
+
+	constructor(registry: Registry, devicepath: string, socket) {
 		super()
 		this.controls = registry.controls
 
@@ -38,13 +49,14 @@ class SurfaceIPElgatoPlugin extends EventEmitter {
 			keysPerRow: 8,
 			keysTotal: 32,
 			deviceId: 'plugin',
+			location: '',
 		}
 
 		this._config = {
 			rotation: 0,
 		}
 
-		socket.on('keydown', (data) => {
+		socket.on('keydown', (data: any) => {
 			let key = data.keyIndex
 			let page = data.page
 			let bank = data.bank
@@ -59,7 +71,7 @@ class SurfaceIPElgatoPlugin extends EventEmitter {
 			}
 		})
 
-		socket.on('keyup', (data) => {
+		socket.on('keyup', (data: any) => {
 			let key = data.keyIndex
 			let page = data.page
 			let bank = data.bank
@@ -74,7 +86,7 @@ class SurfaceIPElgatoPlugin extends EventEmitter {
 			}
 		})
 
-		socket.on('rotate', (data) => {
+		socket.on('rotate', (data: any) => {
 			let key = data.keyIndex
 			let page = data.page
 			let bank = data.bank
@@ -92,34 +104,34 @@ class SurfaceIPElgatoPlugin extends EventEmitter {
 		})
 	}
 
-	quit() {
+	quit(): void {
 		this.socket.removeAllListeners('keyup')
 		this.socket.removeAllListeners('keydown')
 		this.socket.removeAllListeners('rotate')
 	}
 
-	draw(key, buffer, style) {
+	draw(key: number, buffer: Buffer | undefined, style): boolean {
 		if (buffer === undefined || buffer.length != 15552) {
-			this.logger.silly('buffer was not 15552, but ', buffer.length)
+			this.logger.silly('buffer was not 15552, but ', buffer?.length)
 			return false
 		}
 
-		buffer = rotateBuffer(buffer, this._config.rotation)
+		buffer = rotateBuffer(buffer, this._config.rotation ?? 0)
 		this.socket.apicommand('fillImage', { keyIndex: key, data: buffer })
 
 		return true
 	}
 
-	clearDeck() {
+	clearDeck(): void {
 		this.logger.silly('elgato.prototype.clearDeck()')
 		const emptyBuffer = Buffer.alloc(72 * 72 * 3)
 
-		for (let i = 0; i < global.MAX_BUTTONS; ++i) {
+		for (let i = 0; i < MAX_BUTTONS; ++i) {
 			this.socket.apicommand('fillImage', { keyIndex: i, data: emptyBuffer })
 		}
 	}
 
-	setConfig(config) {
+	setConfig(config: SurfaceConfig): void {
 		this._config = config
 	}
 }

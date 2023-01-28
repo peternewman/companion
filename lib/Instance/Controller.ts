@@ -79,7 +79,7 @@ export interface UiInstanceConfig {
 }
 
 class Instance extends CoreBase {
-	#lastClientJson = null
+	#lastClientJson: Record<string, UiInstanceConfig> | null = null
 
 	variable: InstanceVariable
 	definitions: InstanceDefinitions
@@ -305,7 +305,7 @@ class Instance extends CoreBase {
 		return label
 	}
 
-	addInstance(data, disabled): string | undefined {
+	addInstance(data, disabled: boolean): string | undefined {
 		let module = data.type
 		let product = data.product
 

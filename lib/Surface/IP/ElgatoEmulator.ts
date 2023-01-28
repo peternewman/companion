@@ -15,26 +15,29 @@
  *
  */
 
-import { EventEmitter } from 'events'
+import { EventEmitter } from 'eventemitter3'
 import { cloneDeep } from 'lodash-es'
 import LogController from '../../Log/Controller.js'
 import jsonPatch from 'fast-json-patch'
 import debounceFn from 'debounce-fn'
+import { ISurface, ISurfaceEvents, SurfaceConfig, SurfaceInfo } from '../info.js'
+import { Registry, SocketClient } from '../../tmp.js'
+import UIHandler from '../../UI/Handler.js'
 
-export function EmulatorRoom(id) {
+export function EmulatorRoom(id: string): string {
 	return `emulator:${id}`
 }
 
-class SurfaceIPElgatoEmulator extends EventEmitter {
+class SurfaceIPElgatoEmulator extends EventEmitter<ISurfaceEvents> implements ISurface {
 	logger = LogController.createLogger('Surface/IP/ElgatoEmulator')
 
-	#lastSentConfigJson = {}
-	#pendingKeyBuffers = new Set()
+	#lastSentConfigJson: SurfaceConfig = {}
+	#pendingKeyBuffers = new Set<number>()
 
 	#emitChanged = debounceFn(
 		() => {
 			if (this.#pendingKeyBuffers.size > 0) {
-				const newImages = {}
+				const newImages: Record<number, Buffer | false> = {}
 				for (const key of this.#pendingKeyBuffers.values()) {
 					newImages[key] = this.imageCache[key] || false
 				}
@@ -52,7 +55,17 @@ class SurfaceIPElgatoEmulator extends EventEmitter {
 		}
 	)
 
-	constructor(registry, emulatorId) {
+	registry: Registry
+	io: UIHandler
+
+	id: string
+
+	info: SurfaceInfo
+	// _config: SurfaceConfig
+
+	imageCache: Record<number, Buffer | false | undefined>
+
+	constructor(registry: Registry, emulatorId: string) {
 		super()
 
 		this.registry = registry
@@ -67,6 +80,7 @@ class SurfaceIPElgatoEmulator extends EventEmitter {
 			keysPerRow: 8,
 			keysTotal: 32,
 			deviceId: `emulator:${emulatorId}`,
+			location: '',
 		}
 
 		this.logger.debug('Adding Elgato Streamdeck Emulator')
@@ -77,13 +91,13 @@ class SurfaceIPElgatoEmulator extends EventEmitter {
 		}
 	}
 
-	setupClient(client) {
+	setupClient(client: SocketClient): SurfaceConfig {
 		client.emit('emulator:images', this.imageCache)
 
 		return this.#lastSentConfigJson
 	}
 
-	setConfig(config) {
+	setConfig(config: SurfaceConfig): void {
 		const roomName = EmulatorRoom(this.id)
 		if (this.io.countRoomMembers(roomName) > 0) {
 			const patch = jsonPatch.compare(this.#lastSentConfigJson || {}, config || {})
@@ -95,11 +109,11 @@ class SurfaceIPElgatoEmulator extends EventEmitter {
 		this.#lastSentConfigJson = cloneDeep(config)
 	}
 
-	quit() {}
+	quit(): void {}
 
-	draw(key, buffer, style) {
+	draw(key: number, buffer: Buffer | undefined, style): boolean {
 		if (buffer === undefined || buffer.length != 15552) {
-			this.logger.verbose('buffer was not 15552, but ', buffer.length)
+			this.logger.verbose('buffer was not 15552, but ', buffer?.length)
 			return false
 		}
 
@@ -113,7 +127,7 @@ class SurfaceIPElgatoEmulator extends EventEmitter {
 		return true
 	}
 
-	clearDeck() {
+	clearDeck(): void {
 		this.logger.silly('elgato.prototype.clearDeck()')
 
 		// clear all images

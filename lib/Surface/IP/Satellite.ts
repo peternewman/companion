@@ -16,16 +16,37 @@
  */
 import { rotateBuffer } from '../../Resources/Util.js'
 import LogController from '../../Log/Controller.js'
-import { EventEmitter } from 'events'
+import { EventEmitter } from 'eventemitter3'
+import { Socket } from 'net'
+import { ISurface, ISurfaceEvents, SurfaceConfig, SurfaceInfo } from '../info.js'
 
-class SurfaceIPSatellite extends EventEmitter {
+interface SatelliteDeviceInfo {
+	deviceId: string
+	productName: string
+	path: string
+	keysPerRow: number
+	keysTotal: number
+	socket: Socket
+
+	streamBitmaps: boolean
+	streamColors: boolean
+	streamText: boolean
+}
+
+class SurfaceIPSatellite extends EventEmitter<ISurfaceEvents> implements ISurface {
 	logger = LogController.createLogger('Surface/IP/Satellite')
+
+	socket: Socket
+
+	deviceId: string
+	info: SurfaceInfo
+	_config: SurfaceConfig
 
 	#streamBitmaps = false
 	#streamColors = false
 	#streamText = false
 
-	constructor(deviceInfo) {
+	constructor(deviceInfo: SatelliteDeviceInfo) {
 		super()
 
 		this.info = {
@@ -35,7 +56,7 @@ class SurfaceIPSatellite extends EventEmitter {
 			keysPerRow: deviceInfo.keysPerRow,
 			keysTotal: deviceInfo.keysTotal,
 			deviceId: deviceInfo.path,
-			location: deviceInfo.socket.remoteAddress,
+			location: deviceInfo.socket.remoteAddress ?? '',
 		}
 
 		this.deviceId = deviceInfo.deviceId
@@ -58,9 +79,9 @@ class SurfaceIPSatellite extends EventEmitter {
 		}
 	}
 
-	quit() {}
+	quit(): void {}
 
-	draw(key, buffer, style) {
+	draw(key: number, buffer: Buffer | undefined, style): boolean {
 		if (this.socket !== undefined) {
 			let params = ``
 			if (this.#streamColors) {
@@ -72,9 +93,9 @@ class SurfaceIPSatellite extends EventEmitter {
 			}
 			if (this.#streamBitmaps) {
 				if (buffer === undefined || buffer.length != 15552) {
-					this.logger.warn('buffer was not 15552, but ', buffer.length)
+					this.logger.warn('buffer was not 15552, but ', buffer?.length)
 				} else {
-					params += ` BITMAP=${rotateBuffer(buffer, this._config.rotation).toString('base64')}`
+					params += ` BITMAP=${rotateBuffer(buffer, this._config.rotation ?? 0).toString('base64')}`
 				}
 			}
 			if (this.#streamText) {
@@ -99,26 +120,24 @@ class SurfaceIPSatellite extends EventEmitter {
 		return true
 	}
 
-	doButton(key, state) {
+	doButton(key: number, state: boolean): void {
 		this.emit('click', key, state)
 	}
 
-	doRotate(key, direction) {
+	doRotate(key: number, direction: boolean): void {
 		this.emit('rotate', key, direction)
 	}
 
-	clearDeck() {
+	clearDeck(): void {
 		this.logger.silly('elgato.prototype.clearDeck()')
 		if (this.socket !== undefined) {
 			this.socket.write(`KEYS-CLEAR DEVICEID=${this.deviceId}\n`)
 		} else {
-			this.logger.debug('trying to emit to nonexistaant socket: ', this.id)
+			this.logger.debug('trying to emit to nonexistaant socket: ', this.deviceId)
 		}
 	}
 
-	/* elgato-streamdeck functions */
-
-	setConfig(config, force) {
+	setConfig(config: SurfaceConfig, force?: boolean): void {
 		if ((force || this._config.brightness != config.brightness) && config.brightness !== undefined) {
 			this.setBrightness(config.brightness)
 		}
@@ -126,7 +145,7 @@ class SurfaceIPSatellite extends EventEmitter {
 		this._config = config
 	}
 
-	setBrightness(value) {
+	setBrightness(value: number): void {
 		this.logger.silly('brightness: ' + value)
 		if (this.socket !== undefined) {
 			this.socket.write(`BRIGHTNESS DEVICEID=${this.deviceId} VALUE=${value}\n`)

@@ -25,13 +25,15 @@ import { getStreamDeckDeviceInfo } from '@elgato-stream-deck/node'
 import { usb } from 'usb'
 import { listLoupedecks, LoupedeckModelId } from '@loupedeck/node'
 
-import SurfaceHandler from './Handler.js'
+import SurfaceHandler, { SurfaceConfigExt } from './Handler.js'
 import SurfaceUSBController from './USB/Controller.js'
 import SurfaceIPElgatoEmulator, { EmulatorRoom } from './IP/ElgatoEmulator.js'
 import SurfaceIPElgatoPlugin from './IP/ElgatoPlugin.js'
-import SurfaceIPSatellite from './IP/Satellite.js'
+import SurfaceIPSatellite, { SatelliteDeviceInfo } from './IP/Satellite.js'
 
 import CoreBase from '../Core/Base.js'
+import { Registry, SocketClient } from '../tmp.js'
+import { Socket } from 'net'
 
 // Force it to load the hidraw driver just in case
 HID.setDriverType('hidraw')
@@ -39,12 +41,30 @@ HID.devices()
 
 const SurfacesRoom = 'surfaces'
 
+export interface DevicesListEntryBase {
+	index: number
+
+	id: string
+	type: string
+	integrationType: string
+	name: string
+}
+export type DevicesListEntryOffline = DevicesListEntryBase
+export interface DevicesListEntryAvailable extends DevicesListEntryBase {
+	location: string
+	configFields: string[]
+}
+export interface DevicesList {
+	available: Record<string, DevicesListEntryAvailable>
+	offline: Record<string, DevicesListEntryOffline>
+}
+
 class SurfaceController extends CoreBase {
 	/**
 	 * The last sent json object
 	 * @access private
 	 */
-	#lastSentJson = null
+	#lastSentJson: DevicesList | null = null
 
 	/**
 	 * Whether usb hotplug is currently configured and running
@@ -58,7 +78,19 @@ class SurfaceController extends CoreBase {
 	 */
 	#runningRefreshDevices = false
 
-	constructor(registry) {
+	instances: Record<string, SurfaceHandler>
+
+	triggerRefreshDevices = pDebounce(
+		async (): Promise<void> => {
+			this.#refreshDevices()
+		},
+		50,
+		{
+			before: false,
+		}
+	)
+
+	constructor(registry: Registry) {
 		super(registry, 'surfaces', 'Surface/Controller')
 
 		this.instances = {}
@@ -83,10 +115,6 @@ class SurfaceController extends CoreBase {
 			this.updateDevicesList()
 		})
 
-		this.triggerRefreshDevices = pDebounce(async () => this.#refreshDevices(), 50, {
-			before: false,
-		})
-
 		this.triggerRefreshDevicesEvent = this.triggerRefreshDevicesEvent.bind(this)
 
 		const runHotplug = this.userconfig.getKey('usb_hotplug')
@@ -96,7 +124,7 @@ class SurfaceController extends CoreBase {
 		}
 	}
 
-	updateUserConfig(key, value) {
+	updateUserConfig(key: string, value: any) {
 		if (key === 'usb_hotplug') {
 			if (!value && this.#runningUsbHotplug) {
 				// Stop watching
@@ -116,7 +144,7 @@ class SurfaceController extends CoreBase {
 		})
 	}
 
-	addEmulator(id, skipUpdate) {
+	addEmulator(id: string, skipUpdate?: boolean): void {
 		const fullId = EmulatorRoom(id)
 		if (this.instances[fullId]) {
 			throw new Error(`Emulator "${id}" already exists!`)
@@ -136,12 +164,12 @@ class SurfaceController extends CoreBase {
 	 * @param {SocketIO} client - the client socket
 	 * @access public
 	 */
-	clientConnect(client) {
-		client.onPromise('emulator:startup', (id) => {
+	clientConnect(client: SocketClient): void {
+		client.onPromise('emulator:startup', (id: string) => {
 			const fullId = EmulatorRoom(id)
 
 			const instance = this.instances[fullId]
-			if (!instance) {
+			if (!instance || !instance.panel.setupClient) {
 				throw new Error(`Emulator "${id}" does not exist!`)
 			}
 
@@ -151,7 +179,7 @@ class SurfaceController extends CoreBase {
 			return instance.panel.setupClient(client)
 		})
 
-		client.onPromise('emulator:press', (id, keyIndex) => {
+		client.onPromise('emulator:press', (id: string, keyIndex: number) => {
 			const fullId = EmulatorRoom(id)
 
 			const instance = this.instances[fullId]
@@ -162,7 +190,7 @@ class SurfaceController extends CoreBase {
 			instance.panel.emit('click', keyIndex, true)
 		})
 
-		client.onPromise('emulator:release', (id, keyIndex) => {
+		client.onPromise('emulator:release', (id: string, keyIndex: number) => {
 			const fullId = EmulatorRoom(id)
 
 			const instance = this.instances[fullId]
@@ -173,7 +201,7 @@ class SurfaceController extends CoreBase {
 			instance.panel.emit('click', keyIndex, false)
 		})
 
-		client.onPromise('emulator:stop', (id) => {
+		client.onPromise('emulator:stop', (id: string) => {
 			const fullId = EmulatorRoom(id)
 
 			client.leave(fullId)
@@ -191,12 +219,12 @@ class SurfaceController extends CoreBase {
 		client.onPromise('surfaces:rescan', async () => {
 			try {
 				return this.triggerRefreshDevices()
-			} catch (e) {
-				return errMsg
+			} catch (e: any) {
+				return e.message
 			}
 		})
 
-		client.onPromise('surfaces:set-name', (id, name) => {
+		client.onPromise('surfaces:set-name', (id: string, name: string) => {
 			for (let instance of Object.values(this.instances)) {
 				if (instance.deviceId == id) {
 					instance.setPanelName(name)
@@ -205,7 +233,7 @@ class SurfaceController extends CoreBase {
 			}
 		})
 
-		client.onPromise('surfaces:config-get', (id) => {
+		client.onPromise('surfaces:config-get', (id: string) => {
 			for (let instance of Object.values(this.instances)) {
 				if (instance.deviceId == id) {
 					return [instance.getPanelConfig(), instance.getPanelInfo()]
@@ -214,7 +242,7 @@ class SurfaceController extends CoreBase {
 			return null
 		})
 
-		client.onPromise('surfaces:config-set', (id, config) => {
+		client.onPromise('surfaces:config-set', (id: string, config: SurfaceConfigExt) => {
 			for (let instance of Object.values(this.instances)) {
 				if (instance.deviceId == id) {
 					instance.setPanelConfig(config)
@@ -232,7 +260,7 @@ class SurfaceController extends CoreBase {
 			return id
 		})
 
-		client.onPromise('surfaces:emulator-remove', (id) => {
+		client.onPromise('surfaces:emulator-remove', (id: string) => {
 			if (id.startsWith('emulator:') && this.instances[id]) {
 				this.removeDevice(id, true)
 
@@ -242,7 +270,7 @@ class SurfaceController extends CoreBase {
 			}
 		})
 
-		client.onPromise('surfaces:forget', (id) => {
+		client.onPromise('surfaces:forget', (id: string) => {
 			for (let instance of Object.values(this.instances)) {
 				if (instance.deviceId == id) {
 					return 'device is active'
@@ -263,9 +291,9 @@ class SurfaceController extends CoreBase {
 		})
 	}
 
-	getDevicesList() {
-		const availableDevicesInfo = []
-		const offlineDevicesInfo = []
+	getDevicesList(): DevicesList {
+		const availableDevicesInfo: Omit<DevicesListEntryAvailable, 'index'>[] = []
+		const offlineDevicesInfo: Omit<DevicesListEntryOffline, 'index'>[] = []
 
 		const config = this.db.getKey('deviceconfig', {})
 
@@ -279,7 +307,7 @@ class SurfaceController extends CoreBase {
 			const instance = instanceMap.get(id)
 			const conf = config[id]
 
-			const commonInfo = {
+			const commonInfo: Omit<DevicesListEntryBase, 'index'> = {
 				id: id,
 				type: conf?.type || 'Unknown',
 				integrationType: conf?.integrationType || '',
@@ -302,7 +330,7 @@ class SurfaceController extends CoreBase {
 			}
 		}
 
-		function sortDevices(a, b) {
+		function sortDevices<T extends Omit<DevicesListEntryBase, 'index'>>(a: T, b: T) {
 			// emulator must be first
 			if (a.id === 'emulator') {
 				return -1
@@ -322,7 +350,7 @@ class SurfaceController extends CoreBase {
 		availableDevicesInfo.sort(sortDevices)
 		offlineDevicesInfo.sort(sortDevices)
 
-		const res = {
+		const res: DevicesList = {
 			available: {},
 			offline: {},
 		}
@@ -387,12 +415,13 @@ class SurfaceController extends CoreBase {
 
 				this.logger.silly('USB: checking devices (blocking call)')
 
-				await Promise.allSettled(
+				await Promise.allSettled([
 					HID.devices().map(async (deviceInfo) => {
-						if (this.instances[deviceInfo.path] === undefined) {
+						const devicePath = deviceInfo.path
+						if (devicePath && this.instances[devicePath] === undefined) {
 							if (!ignoreStreamDeck) {
 								if (getStreamDeckDeviceInfo(deviceInfo)) {
-									await this.#addDevice(deviceInfo, 'elgato-streamdeck')
+									await this.#addDevice(devicePath, 'elgato-streamdeck')
 									return
 								}
 							}
@@ -401,10 +430,10 @@ class SurfaceController extends CoreBase {
 								deviceInfo.vendorId === 0xffff &&
 								(deviceInfo.productId === 0x1f40 || deviceInfo.productId === 0x1f41)
 							) {
-								await this.#addDevice(deviceInfo, 'infinitton')
+								await this.#addDevice(devicePath, 'infinitton')
 							} else if (deviceInfo.vendorId === 1523 && deviceInfo.interface === 0) {
 								if (this.userconfig.getKey('xkeys_enable')) {
-									await this.#addDevice(deviceInfo, 'xkeys')
+									await this.#addDevice(devicePath, 'xkeys')
 								}
 							}
 						}
@@ -419,14 +448,14 @@ class SurfaceController extends CoreBase {
 												deviceInfo.model === LoupedeckModelId.LoupedeckLive ||
 												deviceInfo.model === LoupedeckModelId.LoupedeckLiveS
 											) {
-												await this.#addDevice(deviceInfo, 'loupedeck-live', true)
+												await this.#addDevice(deviceInfo.path, 'loupedeck-live', true)
 											}
 										}
 									})
 								)
 						  )
-						: null
-				)
+						: null,
+				])
 				console.log('scanForLoupedeck', scanForLoupedeck)
 
 				this.logger.silly('USB: done')
@@ -447,7 +476,7 @@ class SurfaceController extends CoreBase {
 		}
 	}
 
-	addSatelliteDevice(deviceInfo) {
+	addSatelliteDevice(deviceInfo: SatelliteDeviceInfo): SurfaceIPSatellite {
 		this.removeDevice(deviceInfo.path)
 
 		const device = new SurfaceIPSatellite(deviceInfo)
@@ -461,7 +490,7 @@ class SurfaceController extends CoreBase {
 		return device
 	}
 
-	addElgatoPluginDevice(devicePath, socket) {
+	addElgatoPluginDevice(devicePath: string, socket: Socket): SurfaceIPElgatoPlugin {
 		this.removeDevice(devicePath)
 
 		const device = new SurfaceIPElgatoPlugin(this.registry, devicePath, socket)
@@ -475,15 +504,15 @@ class SurfaceController extends CoreBase {
 		return device
 	}
 
-	async #addDevice(deviceInfo, type, skipHidAccessCheck) {
-		this.removeDevice(deviceInfo.path)
+	async #addDevice(devicePath: string, type: string, skipHidAccessCheck?: boolean): Promise<void> {
+		this.removeDevice(devicePath)
 
-		this.logger.silly('add device ' + deviceInfo.path)
+		this.logger.silly('add device ' + devicePath)
 
 		if (!skipHidAccessCheck) {
 			// Check if we have access to the device
 			try {
-				const devicetest = new HID.HID(deviceInfo.path)
+				const devicetest = new HID.HID(devicePath)
 				devicetest.close()
 			} catch (e) {
 				this.logger.error(
@@ -494,8 +523,8 @@ class SurfaceController extends CoreBase {
 		}
 
 		try {
-			const dev = await SurfaceUSBController.openDevice(type, deviceInfo.path)
-			this.instances[deviceInfo.path] = new SurfaceHandler(this.registry, type, dev)
+			const dev = await SurfaceUSBController.openDevice(type, devicePath)
+			this.instances[devicePath] = new SurfaceHandler(this.registry, type, dev)
 
 			setImmediate(() => {
 				this.updateDevicesList()
@@ -505,7 +534,7 @@ class SurfaceController extends CoreBase {
 		}
 	}
 
-	removeDevice(devicePath, purge) {
+	removeDevice(devicePath: string, purge?: boolean): void {
 		if (this.instances[devicePath] !== undefined) {
 			this.logger.silly('remove device ' + devicePath)
 
@@ -520,7 +549,7 @@ class SurfaceController extends CoreBase {
 		this.updateDevicesList()
 	}
 
-	quit() {
+	quit(): void {
 		for (const device of Object.values(this.instances)) {
 			try {
 				device.unload()
@@ -533,7 +562,7 @@ class SurfaceController extends CoreBase {
 		this.updateDevicesList()
 	}
 
-	getDeviceIdFromIndex(index) {
+	getDeviceIdFromIndex(index: number): string | undefined {
 		for (const dev of Object.values(this.getDevicesList().available)) {
 			if (dev.index === index) {
 				return dev.id
@@ -542,25 +571,25 @@ class SurfaceController extends CoreBase {
 		return undefined
 	}
 
-	devicePageUp(deviceId, looseIdMatching) {
+	devicePageUp(deviceId: string, looseIdMatching?: boolean): void {
 		const device = this.#getDeviceForId(deviceId, looseIdMatching)
 		if (device) {
 			device.doPageUp()
 		}
 	}
-	devicePageDown(deviceId, looseIdMatching) {
+	devicePageDown(deviceId: string, looseIdMatching?: boolean): void {
 		const device = this.#getDeviceForId(deviceId, looseIdMatching)
 		if (device) {
 			device.doPageDown()
 		}
 	}
-	devicePageSet(deviceId, page, looseIdMatching) {
+	devicePageSet(deviceId: string, page: number, looseIdMatching?: boolean): void {
 		const device = this.#getDeviceForId(deviceId, looseIdMatching)
 		if (device) {
 			device.setCurrentPage(page)
 		}
 	}
-	devicePageGet(deviceId, looseIdMatching) {
+	devicePageGet(deviceId: string, looseIdMatching?: boolean): number | undefined {
 		const device = this.#getDeviceForId(deviceId, looseIdMatching)
 		if (device) {
 			return device.getCurrentPage()
@@ -569,27 +598,27 @@ class SurfaceController extends CoreBase {
 		}
 	}
 
-	setAllLocked(locked) {
+	setAllLocked(locked: boolean): void {
 		for (const device of Object.values(this.instances)) {
 			device.setLocked(!!locked)
 		}
 	}
 
-	setDeviceLocked(deviceId, locked, looseIdMatching) {
+	setDeviceLocked(deviceId: string, locked: boolean, looseIdMatching?: boolean) {
 		const device = this.#getDeviceForId(deviceId, looseIdMatching)
 		if (device) {
 			device.setLocked(!!locked)
 		}
 	}
 
-	setDeviceBrightness(deviceId, brightness, looseIdMatching) {
+	setDeviceBrightness(deviceId: string, brightness: number, looseIdMatching?: boolean) {
 		const device = this.#getDeviceForId(deviceId, looseIdMatching)
 		if (device) {
 			device.setBrightness(brightness)
 		}
 	}
 
-	#getDeviceForId(deviceId, looseIdMatching) {
+	#getDeviceForId(deviceId: string, looseIdMatching: boolean | undefined) {
 		if (deviceId === 'emulator') deviceId = 'emulator:emulator'
 
 		const instances = Object.values(this.instances)

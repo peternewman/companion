@@ -18,18 +18,24 @@
 import { Server as _http } from 'http'
 import LogController from '../Log/Controller.js'
 import { sendOverIpc } from '../Resources/Util.js'
+import { Express } from 'express'
+import { AddressInfo } from 'net'
+import { Registry } from '../tmp.js'
 
 class UIServer extends _http {
 	logger = LogController.createLogger('UI/Server')
 
-	constructor(registry, express) {
-		super(express)
-		this.registry = registry
+	// TODO - this is too loose
+	bind_ip!: string
+	http_port!: number
 
-		this.registry.on('http_rebind', this.listen_for_http.bind(this))
+	constructor(registry: Registry, express: Express) {
+		super(express)
+
+		registry.on('http_rebind', this.listen_for_http.bind(this))
 	}
 
-	listen_for_http(bind_ip, http_port) {
+	listen_for_http(bind_ip: string, http_port: number): void {
 		this.bind_ip = bind_ip
 		this.http_port = http_port
 
@@ -37,7 +43,7 @@ class UIServer extends _http {
 			this.close()
 		}
 		try {
-			this.on('error', (e) => {
+			this.on('error', (e: any) => {
 				if (e.code == 'EADDRNOTAVAIL') {
 					this.logger.error(`Failed to bind to: ${this.bind_ip}`)
 					sendOverIpc({
@@ -50,10 +56,12 @@ class UIServer extends _http {
 					this.logger.error(e)
 				}
 			}).listen(this.http_port, this.bind_ip, () => {
-				this.logger.info(`new url: http://${this.address().address}:${this.address().port}/`)
+				const address = this.address() as AddressInfo
+
+				this.logger.info(`new url: http://${address.address}:${address.port}/`)
 
 				let ip = this.bind_ip == '0.0.0.0' ? '127.0.0.1' : this.bind_ip
-				let url = `http://${ip}:${this.address().port}/`
+				let url = `http://${ip}:${address.port}/`
 				let info = this.bind_ip == '0.0.0.0' ? `All Interfaces: e.g. ${url}` : url
 				sendOverIpc({
 					messageType: 'http-bind-status',
@@ -62,14 +70,9 @@ class UIServer extends _http {
 					appLaunch: url,
 				})
 			})
-		} catch (e) {
+		} catch (e: any) {
 			this.logger.error(`http bind error: ${e}`)
 		}
-	}
-
-	log(...args) {
-		// TODO
-		this.logger.debug('http', ...args)
 	}
 }
 
