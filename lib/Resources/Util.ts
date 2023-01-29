@@ -73,7 +73,7 @@ export function convert2Digit(num: number): string | number {
 	return num
 }
 
-export function isFalsey(val: string): boolean {
+export function isFalsey(val: string | true): boolean {
 	return (typeof val === 'string' && val.toLowerCase() == 'false') || val == '0'
 }
 

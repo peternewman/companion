@@ -21,7 +21,7 @@ export type SurfaceConfig = Partial<{
 
 export type ISurfaceEvents = {
 	click: [key: number, pressed: boolean, pageOffset?: number]
-	rotate: [key: number, direction: boolean, pageOffset: number]
+	rotate: [key: number, direction: boolean, pageOffset?: number]
 	remove: []
 
 	'xkeys-subscribePage': [pageCount: number]

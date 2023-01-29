@@ -24,16 +24,15 @@ import pDebounce from 'p-debounce'
 import { getStreamDeckDeviceInfo } from '@elgato-stream-deck/node'
 import { usb } from 'usb'
 import { listLoupedecks, LoupedeckModelId } from '@loupedeck/node'
+import CoreBase from '../Core/Base.js'
+import type { Registry, SocketClient } from '../tmp.js'
+import type { WebSocket } from 'ws'
 
 import SurfaceHandler, { SurfaceConfigExt } from './Handler.js'
 import SurfaceUSBController from './USB/Controller.js'
 import SurfaceIPElgatoEmulator, { EmulatorRoom } from './IP/ElgatoEmulator.js'
 import SurfaceIPElgatoPlugin from './IP/ElgatoPlugin.js'
 import SurfaceIPSatellite, { SatelliteDeviceInfo } from './IP/Satellite.js'
-
-import CoreBase from '../Core/Base.js'
-import { Registry, SocketClient } from '../tmp.js'
-import { Socket } from 'net'
 
 // Force it to load the hidraw driver just in case
 HID.setDriverType('hidraw')
@@ -107,7 +106,7 @@ class SurfaceController extends CoreBase {
 		}
 
 		// Initial search for USB devices
-		this.#refreshDevices().catch((e) => {
+		this.#refreshDevices().catch(() => {
 			this.logger.warn('Initial USB scan failed')
 		})
 
@@ -490,7 +489,7 @@ class SurfaceController extends CoreBase {
 		return device
 	}
 
-	addElgatoPluginDevice(devicePath: string, socket: Socket): SurfaceIPElgatoPlugin {
+	addElgatoPluginDevice(devicePath: string, socket: WebSocket): SurfaceIPElgatoPlugin {
 		this.removeDevice(devicePath)
 
 		const device = new SurfaceIPElgatoPlugin(this.registry, devicePath, socket)

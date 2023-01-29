@@ -1,5 +1,7 @@
 import ServiceBase from './Base.js'
-import { WebSocketServer } from 'ws'
+import WebSocket, { WebSocketServer } from 'ws'
+import { ButtonRender, Registry } from '../tmp.js'
+import { IncomingMessage } from 'http'
 
 /**
  * Class providing the Elgato Plugin service.
@@ -22,19 +24,18 @@ import { WebSocketServer } from 'ws'
  * develop commercial activities involving the Companion software without
  * disclosing the source code of your own applications.
  */
-class ServiceElgatoPlugin extends ServiceBase {
-	/**
-	 * The port to open the socket with.  Default: <code>28492</code>
-	 * @type {number}
-	 * @access protected
-	 */
-	port = 28492
+class ServiceElgatoPlugin extends ServiceBase<WebSocketServer> {
+	private client: WebSocket | undefined
+
+	private button_listeners = new Set<string>()
 
 	/**
 	 * @param {Registry} registry - the application's core
 	 */
-	constructor(registry) {
-		super(registry, 'elgato-plugin', 'Service/ElgatoPlugin', 'elgato_plugin_enable')
+	constructor(registry: Registry) {
+		super(registry, 'elgato-plugin', 'Service/ElgatoPlugin', 'elgato_plugin_enable', undefined)
+
+		this.port = 28492
 
 		this.graphics.on('bank_invalidated', this.handleBankChanged.bind(this))
 
@@ -45,7 +46,7 @@ class ServiceElgatoPlugin extends ServiceBase {
 	 * Close the socket before deleting it
 	 * @access protected
 	 */
-	close() {
+	close(): void {
 		if (this.server) {
 			this.logger.info('Shutting down')
 
@@ -63,13 +64,18 @@ class ServiceElgatoPlugin extends ServiceBase {
 	 * @param {string} page - the page number
 	 * @param {string} bank - the bank number
 	 */
-	handleBankChanged(page, bank, render) {
-		page = parseInt(page)
-		bank = parseInt(bank) - 1
+	handleBankChanged(page: number, bank: number, render: ButtonRender): void {
+		page = Number(page)
+		bank = Number(bank) - 1
 
-		if (this.client && this.client.button_listeners) {
-			if (this.client.button_listeners.has(`${page}_${bank}`)) {
-				this.client.apicommand('fillImage', { page: page, bank: bank, keyIndex: bank, data: render.buffer })
+		if (this.client && this.button_listeners) {
+			if (this.button_listeners.has(`${page}_${bank}`)) {
+				this.#socketSend(this.client, 'fillImage', {
+					page: page,
+					bank: bank,
+					keyIndex: bank,
+					data: render.buffer,
+				})
 			}
 		}
 	}
@@ -78,25 +84,25 @@ class ServiceElgatoPlugin extends ServiceBase {
 	 * Setup the socket for v2 API
 	 * @param {Socket} socket - the client socket
 	 */
-	initAPI2(socket) {
+	initAPI2(socket: WebSocket, req: IncomingMessage): void {
 		this.logger.silly('init api v2')
-		socket.once('new_device', (id) => {
-			this.logger.silly('add device: ' + socket.remoteAddress, id)
+		socket.once('new_device', (id: string) => {
+			this.logger.silly('add device: ' + req.socket.remoteAddress, id)
 
 			// Use ip right now, since the pluginUUID is new on each boot and makes Companion
 			// forget all settings for the device. (page and orientation)
-			id = 'elgato_plugin-' + socket.remoteAddress
+			id = 'elgato_plugin-' + req.socket.remoteAddress
 
 			this.surfaces.addElgatoPluginDevice(id, socket)
 
-			socket.apireply('new_device', { result: true })
-
-			socket.button_listeners = new Set()
+			this.#socketSend(socket, 'new_device', { result: true })
 
 			this.client = socket
+			this.button_listeners = new Set()
 
 			socket.on('close', () => {
-				delete socket.button_listeners
+				this.button_listeners = new Set()
+
 				this.surfaces.removeDevice(id)
 				socket.removeAllListeners('keyup')
 				socket.removeAllListeners('keydown')
@@ -104,12 +110,12 @@ class ServiceElgatoPlugin extends ServiceBase {
 			})
 		})
 
-		socket.on('request_button', (args) => {
+		socket.on('request_button', (args: any) => {
 			this.logger.silly('request_button: ', args)
 
-			socket.button_listeners.add(`${args.page}_${args.bank}`)
+			this.button_listeners.add(`${args.page}_${args.bank}`)
 
-			socket.apireply('request_button', { result: 'ok' })
+			this.#socketSend(socket, 'request_button', { result: 'ok' })
 
 			this.handleBankChanged(
 				args.page,
@@ -118,12 +124,12 @@ class ServiceElgatoPlugin extends ServiceBase {
 			)
 		})
 
-		socket.on('unrequest_button', (args) => {
+		socket.on('unrequest_button', (args: any) => {
 			this.logger.silly('unrequest_button: ', args)
 
-			socket.button_listeners.delete(`${args.page}_${args.bank}`)
+			this.button_listeners.delete(`${args.page}_${args.bank}`)
 
-			socket.apireply('request_button', { result: 'ok' })
+			this.#socketSend(socket, 'request_button', { result: 'ok' })
 		})
 	}
 
@@ -131,23 +137,20 @@ class ServiceElgatoPlugin extends ServiceBase {
 	 * Setup the socket processing and rig the appropriate version processing
 	 * @param {Socket} socket - the client socket
 	 */
-	initSocket(socket) {
-		socket.apireply = this.socketResponse.bind(this, socket)
-		socket.apicommand = this.socketCommand.bind(this, socket)
-
+	initSocket(socket: WebSocket, req: IncomingMessage) {
 		socket.on('version', (args) => {
 			if (args.version > 2) {
 				// Newer than current api version
-				socket.apireply('version', { version: 2, error: 'cannot continue' })
+				this.#socketSend(socket, 'version', { version: 2, error: 'cannot continue' })
 				socket.close()
 			} else if (args.version === 1) {
 				// We don't support v1 anymore
-				socket.apireply('version', { version: 2, error: 'no longer supported' })
+				this.#socketSend(socket, 'version', { version: 2, error: 'no longer supported' })
 				socket.close()
 			} else {
-				socket.apireply('version', { version: 2 })
+				this.#socketSend(socket, 'version', { version: 2 })
 
-				this.initAPI2(socket)
+				this.initAPI2(socket, req)
 			}
 		})
 	}
@@ -158,7 +161,7 @@ class ServiceElgatoPlugin extends ServiceBase {
 	 */
 	listen() {
 		if (this.portConfig !== undefined) {
-			this.port = this.userconfig.getKey(this.portConfig)
+			this.port = Number(this.userconfig.getKey(this.portConfig))
 		}
 
 		if (this.server === undefined) {
@@ -171,7 +174,7 @@ class ServiceElgatoPlugin extends ServiceBase {
 
 				this.currentState = true
 				this.logger.info('Listening on port ' + this.port)
-			} catch (e) {
+			} catch (e: any) {
 				this.logger.error(`Could not launch: ${e.message}`)
 			}
 		}
@@ -181,10 +184,10 @@ class ServiceElgatoPlugin extends ServiceBase {
 	 * Set up a new socket connection
 	 * @param {WebSocketRequest} req - the request
 	 */
-	processIncoming(socket) {
-		this.logger.silly('New connection from ' + socket.remoteAddress)
+	processIncoming(socket: WebSocket, req: IncomingMessage) {
+		this.logger.silly('New connection from ' + req.socket.remoteAddress)
 
-		this.initSocket(socket)
+		this.initSocket(socket, req)
 
 		socket.on('message', (message) => {
 			try {
@@ -197,27 +200,17 @@ class ServiceElgatoPlugin extends ServiceBase {
 		})
 
 		socket.on('close', () => {
-			this.logger.silly('Connection from ' + socket.remoteAddress + ' disconnected')
+			this.logger.silly('Connection from ' + req.socket.remoteAddress + ' disconnected')
 		})
 	}
 
 	/**
-	 * Package and send a command
+	 * Package and send a message
 	 * @param {Socket} socket - the client socket
 	 * @param {string} command - the command
 	 * @param {Object} args - arguemtns for the command
 	 */
-	socketCommand(socket, command, args) {
-		socket.send(JSON.stringify({ command: command, arguments: args }))
-	}
-
-	/**
-	 * Package and send a response
-	 * @param {Socket} socket - the client socket
-	 * @param {string} command - the command
-	 * @param {Object} args - arguemtns for the command
-	 */
-	socketResponse(socket, command, args) {
+	#socketSend(socket: WebSocket, command: string, args: any): void {
 		socket.send(JSON.stringify({ response: command, arguments: args }))
 	}
 }

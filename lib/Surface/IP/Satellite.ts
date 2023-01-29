@@ -20,7 +20,7 @@ import { EventEmitter } from 'eventemitter3'
 import { Socket } from 'net'
 import { ISurface, ISurfaceEvents, SurfaceConfig, SurfaceInfo } from '../info.js'
 
-interface SatelliteDeviceInfo {
+export interface SatelliteDeviceInfo {
 	deviceId: string
 	productName: string
 	path: string

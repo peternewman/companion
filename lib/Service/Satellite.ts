@@ -1,6 +1,10 @@
 import ServiceBase from './Base.js'
 import { isFalsey, parseLineParameters } from '../Resources/Util.js'
-import net from 'net'
+import net, { Server, Socket } from 'net'
+import { Registry } from '../tmp.js'
+import { ChildLogger } from '../Log/Controller.js'
+import { MAX_BUTTONS, MAX_BUTTONS_PER_ROW } from '../Resources/Constants.js'
+import type SurfaceIPSatellite from '../Surface/IP/Satellite.js'
 
 /**
  * Version of this API. This follows semver, to allow for clients to check their compatability
@@ -10,6 +14,19 @@ import net from 'net'
  * 1.3.0 - Add KEY-ROTATE message
  */
 const API_VERSION = '1.3.0'
+
+export interface SocketExt extends Socket {
+	name: string
+
+	logger: ChildLogger
+}
+
+export interface SatelliteDevice {
+	id: string
+	socket: SocketExt
+
+	device: SurfaceIPSatellite
+}
 
 /**
  * Class providing the Satellite/Remote Surface api.
@@ -32,25 +49,21 @@ const API_VERSION = '1.3.0'
  * develop commercial activities involving the Companion software without
  * disclosing the source code of your own applications.
  */
-class ServiceSatellite extends ServiceBase {
+class ServiceSatellite extends ServiceBase<Server> {
 	/**
 	 * The remote devices
 	 * @type {Object}
 	 * @access protected
 	 */
-	devices = {}
-	/**
-	 * The port to open the socket with.  Default: <code>16622</code>
-	 * @type {number}
-	 * @access protected
-	 */
-	port = 16622
+	devices: Record<string, SatelliteDevice> = {}
 
 	/**
 	 * @param {Registry} registry - the application core
 	 */
-	constructor(registry) {
-		super(registry, 'satellite', 'Service/Satellite')
+	constructor(registry: Registry) {
+		super(registry, 'satellite', 'Service/Satellite', undefined, undefined)
+
+		this.port = 16622
 
 		this.init()
 	}
@@ -60,12 +73,12 @@ class ServiceSatellite extends ServiceBase {
 	 * @param {Socket} socket - the client socket
 	 * @param {Object} params - the device parameters
 	 */
-	addDevice(socket, params) {
-		if (!params.DEVICEID) {
+	addDevice(socket: SocketExt, params: Record<string, string | true | undefined>): void {
+		if (typeof params.DEVICEID !== 'string' || !params.DEVICEID) {
 			socket.write(`ADD-DEVICE ERROR MESSAGE="Missing DEVICEID"\n`)
 			return
 		}
-		if (!params.PRODUCT_NAME) {
+		if (typeof params.PRODUCT_NAME !== 'string' || !params.PRODUCT_NAME) {
 			socket.write(`ADD-DEVICE ERROR DEVICEID="${params.DEVICEID}" MESSAGE="Missing PRODUCT_NAME"\n`)
 			return
 		}
@@ -78,7 +91,7 @@ class ServiceSatellite extends ServiceBase {
 
 		const id = `${params.DEVICEID}`
 
-		const existing = Object.entries(this.devices).find(([internalId, dev]) => dev.id === id)
+		const existing = Object.entries(this.devices).find(([_internalId, dev]) => dev.id === id)
 		if (existing) {
 			if (existing[1].socket === socket) {
 				socket.write(`ADD-DEVICE ERROR DEVICEID="${params.DEVICEID}" MESSAGE="Device already added"\n`)
@@ -89,14 +102,14 @@ class ServiceSatellite extends ServiceBase {
 			}
 		}
 
-		const keysTotal = params.KEYS_TOTAL ? parseInt(params.KEYS_TOTAL) : global.MAX_BUTTONS
-		if (isNaN(keysTotal) || keysTotal > global.MAX_BUTTONS || keysTotal <= 0) {
+		const keysTotal = params.KEYS_TOTAL ? Number(params.KEYS_TOTAL) : MAX_BUTTONS
+		if (isNaN(keysTotal) || keysTotal > MAX_BUTTONS || keysTotal <= 0) {
 			socket.write(`ADD-DEVICE ERROR DEVICEID="${params.DEVICEID}" MESSAGE="Invalid KEYS_TOTAL"\n`)
 			return
 		}
 
-		const keysPerRow = params.KEYS_PER_ROW ? parseInt(params.KEYS_PER_ROW) : global.MAX_BUTTONS_PER_ROW
-		if (isNaN(keysPerRow) || keysPerRow > global.MAX_BUTTONS || keysPerRow <= 0) {
+		const keysPerRow = params.KEYS_PER_ROW ? Number(params.KEYS_PER_ROW) : MAX_BUTTONS_PER_ROW
+		if (isNaN(keysPerRow) || keysPerRow > MAX_BUTTONS || keysPerRow <= 0) {
 			socket.write(`ADD-DEVICE ERROR DEVICEID="${params.DEVICEID}" MESSAGE="Invalid KEYS_PER_ROW"\n`)
 			return
 		}
@@ -133,7 +146,7 @@ class ServiceSatellite extends ServiceBase {
 	 * @param {Socket} socket - the client socket
 	 * @param {string} line - the received command
 	 */
-	handleCommand(socket, line) {
+	handleCommand(socket: SocketExt, line: string): void {
 		if (!line.trim().toUpperCase().startsWith('PING')) {
 			socket.logger.silly(`received "${line}"`)
 		}
@@ -173,10 +186,11 @@ class ServiceSatellite extends ServiceBase {
 
 	listen() {
 		this.server = net.createServer((socket) => {
-			socket.name = socket.remoteAddress + ':' + socket.remotePort
-			socket.logger = this.registry.log.createLogger(`Service/Satellite/${socket.name}`)
+			const socketExt = socket as unknown as SocketExt
+			socketExt.name = socket.remoteAddress + ':' + socket.remotePort
+			socketExt.logger = this.registry.log.createLogger(`Service/Satellite/${socketExt.name}`)
 
-			this.initSocket(socket)
+			this.initSocket(socketExt)
 		})
 		this.server.on('error', (e) => {
 			this.logger.debug(`listen-socket error: ${e}`)
@@ -193,7 +207,7 @@ class ServiceSatellite extends ServiceBase {
 	 * Set up a client socket
 	 * @param {Socket} socket - the client socket
 	 */
-	initSocket(socket) {
+	initSocket(socket: SocketExt): void {
 		socket.logger.info(`new connection`)
 
 		let receivebuffer = ''
@@ -211,7 +225,7 @@ class ServiceSatellite extends ServiceBase {
 			receivebuffer = receivebuffer.substr(offset)
 		})
 
-		socket.on('error', (e) => {
+		socket.on('error', (e: any) => {
 			socket.logger.silly('socket error:', e)
 		})
 
@@ -248,7 +262,7 @@ class ServiceSatellite extends ServiceBase {
 	 * @param {Socket} socket - the client socket
 	 * @param {Object} params - the key press parameters
 	 */
-	keyPress(socket, params) {
+	keyPress(socket: SocketExt, params: Record<string, string | true | undefined>) {
 		if (!params.DEVICEID) {
 			socket.write(`KEY-PRESS ERROR MESSAGE="Missing DEVICEID"\n`)
 			return
@@ -262,8 +276,8 @@ class ServiceSatellite extends ServiceBase {
 			return
 		}
 
-		const key = parseInt(params.KEY)
-		if (isNaN(key) || key > global.MAX_BUTTONS || key < 0) {
+		const key = Number(params.KEY)
+		if (isNaN(key) || key > MAX_BUTTONS || key < 0) {
 			socket.write(`KEY-PRESS ERROR DEVICEID="${params.DEVICEID}" MESSAGE="Invalid KEY"\n`)
 			return
 		}
@@ -286,7 +300,7 @@ class ServiceSatellite extends ServiceBase {
 	 * @param {Socket} socket - the client socket
 	 * @param {Object} params - the key rotate parameters
 	 */
-	keyRotate(socket, params) {
+	keyRotate(socket: SocketExt, params: Record<string, string | true | undefined>) {
 		if (!params.DEVICEID) {
 			socket.write(`KEY-ROTATE ERROR MESSAGE="Missing DEVICEID"\n`)
 			return
@@ -300,8 +314,8 @@ class ServiceSatellite extends ServiceBase {
 			return
 		}
 
-		const key = parseInt(params.KEY)
-		if (isNaN(key) || key > global.MAX_BUTTONS || key < 0) {
+		const key = Number(params.KEY)
+		if (isNaN(key) || key > MAX_BUTTONS || key < 0) {
 			socket.write(`KEY-ROTATE ERROR DEVICEID="${params.DEVICEID}" MESSAGE="Invalid KEY"\n`)
 			return
 		}
@@ -323,7 +337,7 @@ class ServiceSatellite extends ServiceBase {
 	 * @param {Socket} socket - the client socket
 	 * @param {Object} params - the device parameters
 	 */
-	removeDevice(socket, params) {
+	removeDevice(socket: SocketExt, params: Record<string, string | true | undefined>) {
 		if (!params.DEVICEID) {
 			socket.write(`REMOVE-DEVICE ERROR MESSAGE="Missing DEVICEID"\n`)
 			return

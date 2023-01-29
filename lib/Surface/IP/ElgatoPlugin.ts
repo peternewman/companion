@@ -19,22 +19,23 @@ import LogController from '../../Log/Controller.js'
 import { rotateBuffer } from '../../Resources/Util.js'
 import { EventEmitter } from 'eventemitter3'
 import { CreateBankControlId } from '../../Shared/ControlId.js'
-import { Registry } from '../../tmp.js'
+import type { Registry } from '../../tmp.js'
 import ControlsController from '../../Controls/Controller.js'
-import { SurfaceInfo, SurfaceConfig, ISurface, ISurfaceEvents } from '../info.js'
+import type { SurfaceInfo, SurfaceConfig, ISurface, ISurfaceEvents } from '../info.js'
 import { MAX_BUTTONS } from '../../Resources/Constants.js'
+import type { WebSocket } from 'ws'
 
 class SurfaceIPElgatoPlugin extends EventEmitter<ISurfaceEvents> implements ISurface {
 	logger = LogController.createLogger('Surface/IP/ElgatoPlugin')
 
-	private controls: ControlsController
+	private readonly controls: ControlsController
 
-	socket: unknown
+	private readonly socket: WebSocket
 
 	info: SurfaceInfo
 	_config: SurfaceConfig
 
-	constructor(registry: Registry, devicepath: string, socket) {
+	constructor(registry: Registry, devicepath: string, socket: WebSocket) {
 		super()
 		this.controls = registry.controls
 
@@ -117,7 +118,15 @@ class SurfaceIPElgatoPlugin extends EventEmitter<ISurfaceEvents> implements ISur
 		}
 
 		buffer = rotateBuffer(buffer, this._config.rotation ?? 0)
-		this.socket.apicommand('fillImage', { keyIndex: key, data: buffer })
+		this.socket.send(
+			JSON.stringify({
+				command: 'fillImage',
+				arguments: {
+					keyIndex: key,
+					data: buffer,
+				},
+			})
+		)
 
 		return true
 	}
@@ -127,7 +136,15 @@ class SurfaceIPElgatoPlugin extends EventEmitter<ISurfaceEvents> implements ISur
 		const emptyBuffer = Buffer.alloc(72 * 72 * 3)
 
 		for (let i = 0; i < MAX_BUTTONS; ++i) {
-			this.socket.apicommand('fillImage', { keyIndex: i, data: emptyBuffer })
+			this.socket.send(
+				JSON.stringify({
+					command: 'fillImage',
+					arguments: {
+						keyIndex: i,
+						data: emptyBuffer,
+					},
+				})
+			)
 		}
 	}
 

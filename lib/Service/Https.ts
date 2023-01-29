@@ -1,6 +1,10 @@
 import _https from 'https'
 import fs from 'fs'
 import ServiceBase from './Base.js'
+import type UIExpress from '../UI/Express.js'
+import { Registry } from '../tmp.js'
+
+type Credentials = Pick<_https.ServerOptions, 'key' | 'cert' | 'ca'>
 
 /**
  * Class providing the HTTPS web interface.
@@ -23,35 +27,32 @@ import ServiceBase from './Base.js'
  * develop commercial activities involving the Companion software without
  * disclosing the source code of your own applications.
  */
-class ServiceHttps extends ServiceBase {
+class ServiceHttps extends ServiceBase<_https.Server> {
 	/**
 	 * The config ip to bind the service to
 	 * @type {?string}
 	 * @access protected
 	 */
-	bindIP
+	bindIP!: string
+
 	/**
 	 * The web application framework
 	 * @type {?UIExpress}
 	 * @access protected
 	 */
-	express
-	/**
-	 * The port to open the socket with.  Default: <code>8443</code>
-	 * @type {number}
-	 * @access protected
-	 */
-	port = 8443
+	express: UIExpress
 
 	/**
 	 * @param {Registry} registry - the core registry
 	 * @param {UIExpress} express - the app framework
 	 */
-	constructor(registry, express) {
+	constructor(registry: Registry, express: UIExpress) {
 		super(registry, 'https', 'Service/Https', 'https_enabled', 'https_port')
 		this.express = express
 
-		this.registry.on('http_rebind', (bindIP) => {
+		this.port = 8443
+
+		this.registry.on('http_rebind', (bindIP: string) => {
 			this.bindIP = bindIP
 			this.restartModule()
 		})
@@ -64,31 +65,31 @@ class ServiceHttps extends ServiceBase {
 	 * Start the service if it is not already running
 	 * @access protected
 	 */
-	listen() {
+	listen(): void {
 		if (this.server === undefined) {
 			if (this.userconfig.getKey('https_cert_type') == 'external') {
 				const priv = this.userconfig.getKey('https_ext_private_key')
 				const cert = this.userconfig.getKey('https_ext_certificate')
 				const chain = this.userconfig.getKey('https_ext_chain')
 
-				if (priv != '' && cert != '') {
+				if (priv && cert) {
 					try {
-						const privateKey = fs.readFileSync(priv, 'utf8')
+						const privateKey = fs.readFileSync(priv + '', 'utf8')
 						this.logger.debug(`Read private key file: ${priv}`)
 						this.logger.silly(`Read private key file: ${priv}`)
 
-						const certificate = fs.readFileSync(cert, 'utf8')
+						const certificate = fs.readFileSync(cert + '', 'utf8')
 						this.logger.debug(`Read certificate file: ${cert}`)
 						this.logger.silly(`Read certificate file: ${cert}`)
 
-						const credentials = {
+						const credentials: Credentials = {
 							key: privateKey,
 							cert: certificate,
 						}
 
-						if (chain != '' && fs.existsSync(chain)) {
+						if (chain && fs.existsSync(chain + '')) {
 							try {
-								const ca = fs.readFileSync(chain, 'utf8')
+								const ca = fs.readFileSync(chain + '', 'utf8')
 								this.logger.debug(`Read chain file: ${chain}`)
 								this.logger.silly(`Read chain file: ${chain}`)
 								credentials.ca = ca
@@ -111,11 +112,11 @@ class ServiceHttps extends ServiceBase {
 				const priv = this.userconfig.getKey('https_self_cert_private')
 				const cert = this.userconfig.getKey('https_self_cert')
 
-				if (priv != '' && cert != '') {
+				if (priv && cert) {
 					try {
-						const credentials = {
-							key: priv,
-							cert: cert,
+						const credentials: Credentials = {
+							key: priv + '',
+							cert: cert + '',
 						}
 
 						this.startServer(credentials)
@@ -135,16 +136,12 @@ class ServiceHttps extends ServiceBase {
 	 * Try to start the service with a certificate
 	 * @param {Object} credentials - the certificate information
 	 */
-	startServer(credentials) {
+	startServer(credentials: Credentials) {
 		try {
 			this.server = _https.createServer(credentials, this.express)
 			this.server.on('error', this.handleSocketError.bind(this))
 			this.server.listen(this.port, this.bindIP)
 			this.io.enableHttps(this.server)
-
-			this.server.log = (...args) => {
-				this.logger.silly('log', 'https', ...args)
-			}
 
 			this.currentState = true
 			this.logger.info(`Listening at https://${this.bindIP}:${this.port}`)
@@ -162,7 +159,7 @@ class ServiceHttps extends ServiceBase {
 	 * @param {(boolean|number|string)} value - the saved value
 	 * @access protected
 	 */
-	updateUserConfig(key, value) {
+	updateUserConfig(key: string, value: any) {
 		super.updateUserConfig(key, value)
 
 		if (key.substring(0, 6) == 'https_' && key != this.enableConfig && key != this.portConfig) {
