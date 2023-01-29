@@ -218,7 +218,7 @@ export default class ControlTrigger
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionAdd(_stepId: string, _setId: string, actionItem: ActionInstance) {
+	actionAdd(_stepId: number, _setId: string, actionItem: ActionInstance) {
 		return this.actions.actionAdd('0', actionItem)
 	}
 
@@ -229,7 +229,7 @@ export default class ControlTrigger
 	 * @param {Array} newActions actions to append
 	 * @access public
 	 */
-	actionAppend(_stepId: string, _setId: string, newActions: ActionInstance[]) {
+	actionAppend(_stepId: number, _setId: string, newActions: ActionInstance[]) {
 		return this.actions.actionAppend('0', newActions)
 	}
 
@@ -241,7 +241,7 @@ export default class ControlTrigger
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	async actionLearn(_stepId: string, _setId: string, id: string): Promise<boolean> {
+	async actionLearn(_stepId: number, _setId: string, id: string): Promise<boolean> {
 		return this.actions.actionLearn('0', id)
 	}
 
@@ -253,7 +253,7 @@ export default class ControlTrigger
 	 * @param {boolean} enabled
 	 * @access public
 	 */
-	actionEnabled(_stepId: string, _setId: string, id: string, enabled: boolean): boolean {
+	actionEnabled(_stepId: number, _setId: string, id: string, enabled: boolean): boolean {
 		return this.actions.actionEnabled('0', id, enabled)
 	}
 
@@ -265,7 +265,7 @@ export default class ControlTrigger
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionRemove(_stepId: string, _setId: string, id: string) {
+	actionRemove(_stepId: number, _setId: string, id: string) {
 		return this.actions.actionRemove('0', id)
 	}
 
@@ -277,7 +277,7 @@ export default class ControlTrigger
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionDuplicate(_stepId: string, _setId: string, id: string) {
+	actionDuplicate(_stepId: number, _setId: string, id: string) {
 		return this.actions.actionDuplicate('0', id)
 	}
 
@@ -288,7 +288,7 @@ export default class ControlTrigger
 	 * @param {Array} newActions actions to populate
 	 * @access public
 	 */
-	actionReplaceAll(_stepId: string, _setId: string, newActions: ActionInstance[]) {
+	actionReplaceAll(_stepId: number, _setId: string, newActions: ActionInstance[]) {
 		return this.actions.actionReplaceAll('0', newActions)
 	}
 
@@ -301,7 +301,7 @@ export default class ControlTrigger
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionSetDelay(_stepId: string, _setId: string, id: string, delay: number) {
+	actionSetDelay(_stepId: number, _setId: string, id: string, delay: number) {
 		return this.actions.actionSetDelay('0', id, delay)
 	}
 
@@ -315,7 +315,7 @@ export default class ControlTrigger
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionSetOption(_stepId: string, _setId: string, id: string, key: string, value: any) {
+	actionSetOption(_stepId: number, _setId: string, id: string, key: string, value: any) {
 		return this.actions.actionSetOption('0', id, key, value)
 	}
 

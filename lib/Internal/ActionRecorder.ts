@@ -186,7 +186,7 @@ export default class ActionRecorder extends InternalFragment {
 
 			return true
 		} else if (action.action === 'action_recorder_save_to_button') {
-			let stepId = this.instance.variable.parseVariables(action.options.step).text
+			let stepId = Number(this.instance.variable.parseVariables(action.options.step).text)
 			let setId = this.instance.variable.parseVariables(action.options.set).text
 			const pageRaw = this.instance.variable.parseVariables(action.options.page).text
 			const bankRaw = this.instance.variable.parseVariables(action.options.bank).text

@@ -108,7 +108,7 @@ export interface ControlBaseWithSteps {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	stepRemove(stepId: string): boolean
+	stepRemove(stepId: number): boolean
 
 	/**
 	 * Set the current (next to execute) action-set by id
@@ -116,7 +116,7 @@ export interface ControlBaseWithSteps {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	stepSelectNext(stepId: string): boolean
+	stepSelectNext(stepId: number): boolean
 
 	/**
 	 * Swap two action-sets
@@ -139,7 +139,7 @@ export interface ControlBaseWithDynamicActionSets {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionSetAdd(stepId: string): boolean
+	actionSetAdd(stepId: number): boolean
 
 	/**
 	 * Remove an action-set from this control
@@ -147,7 +147,7 @@ export interface ControlBaseWithDynamicActionSets {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionSetRemove(stepId: string, setId: string): boolean
+	actionSetRemove(stepId: number, setId: string): boolean
 
 	/**
 	 * Rename an action-sets
@@ -156,9 +156,9 @@ export interface ControlBaseWithDynamicActionSets {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionSetRename(stepId: string, oldSetId0: string, newSetId0: string): boolean
+	actionSetRename(stepId: number, oldSetId0: string, newSetId0: string): boolean
 
-	actionSetRunWhileHeld(stepId: string, setId0: string, runWhileHeld: boolean): boolean
+	actionSetRunWhileHeld(stepId: number, setId0: string, runWhileHeld: boolean): boolean
 }
 
 export interface ControlBaseWithActions {
@@ -170,7 +170,7 @@ export interface ControlBaseWithActions {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionAdd(stepId: string, setId: string, actionItem: ActionInstance): boolean
+	actionAdd(stepId: number, setId: string, actionItem: ActionInstance): boolean
 
 	// /**
 	//  * Append some actions to this button
@@ -179,7 +179,7 @@ export interface ControlBaseWithActions {
 	//  * @param {Array} newActions actions to append
 	//  * @access public
 	//  */
-	// actionAppend(stepId: string, setId: string, newActions: ActionInstance[]): boolean
+	// actionAppend(stepId: number, setId: string, newActions: ActionInstance[]): boolean
 
 	/**
 	 * Duplicate an action on this control
@@ -189,7 +189,7 @@ export interface ControlBaseWithActions {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionDuplicate(stepId: string, setId: string, id: string): boolean
+	actionDuplicate(stepId: number, setId: string, id: string): boolean
 
 	/**
 	 * Enable or disable an action
@@ -199,7 +199,7 @@ export interface ControlBaseWithActions {
 	 * @param {boolean} enabled
 	 * @access public
 	 */
-	actionEnabled(stepId: string, setId: string, id: string, enabled: boolean): boolean
+	actionEnabled(stepId: number, setId: string, id: string, enabled: boolean): boolean
 
 	/**
 	 * Learn the options for an action, by asking the instance for the current values
@@ -209,7 +209,7 @@ export interface ControlBaseWithActions {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionLearn(stepId: string, setId: string, id: string): Promise<boolean>
+	actionLearn(stepId: number, setId: string, id: string): Promise<boolean>
 
 	/**
 	 * Remove an action from this control
@@ -219,7 +219,7 @@ export interface ControlBaseWithActions {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionRemove(stepId: string, setId: string, id: string): boolean
+	actionRemove(stepId: number, setId: string, id: string): boolean
 
 	/**
 	 * Reorder an action in the list or move between sets
@@ -255,7 +255,7 @@ export interface ControlBaseWithActions {
 	//  * @param {Array} newActions actions to populate
 	//  * @access public
 	//  */
-	// actionReplaceAll(stepId: string, setId: string, newActions: ActionInstance[]): boolean
+	// actionReplaceAll(stepId: number, setId: string, newActions: ActionInstance[]): boolean
 
 	/**
 	 * Set the delay of an action
@@ -266,7 +266,7 @@ export interface ControlBaseWithActions {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionSetDelay(stepId: string, setId: string, id: string, delay: number): boolean
+	actionSetDelay(stepId: number, setId: string, id: string, delay: number): boolean
 
 	/**
 	 * Set an opton of an action
@@ -278,7 +278,7 @@ export interface ControlBaseWithActions {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionSetOption(stepId: string, setId: string, id: string, key: string, value: any): boolean
+	actionSetOption(stepId: number, setId: string, id: string, key: string, value: any): boolean
 
 	/**
 	 * Check the status of a bank, and re-draw if needed

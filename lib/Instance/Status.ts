@@ -47,7 +47,7 @@ class Status extends CoreBase {
 	 */
 	updateInstanceStatus(
 		instance_id: string,
-		level: ModuleStatusLevel | 'crashed' | null,
+		level: ModuleStatusLevel | 'crashed' | 'initializing' | null,
 		msg: string | undefined | null
 	) {
 		let category: InstanceStatusCategory | null = InstanceStatusCategory.Warning
@@ -63,6 +63,7 @@ class Status extends CoreBase {
 			case 'disconnected':
 			case 'connection_failure':
 			case 'crashed':
+			case 'initializing':
 			case 'unknown_error':
 				category = InstanceStatusCategory.Error
 				break

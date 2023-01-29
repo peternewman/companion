@@ -254,7 +254,7 @@ export default class ActionRecorder extends CoreBase {
 		)
 		client.onPromise(
 			'action-recorder:session:save-to-control',
-			(sessionId: string, controlId: string, stepId: string, setId: string, mode: 'replace' | 'append') => {
+			(sessionId: string, controlId: string, stepId: number, setId: string, mode: 'replace' | 'append') => {
 				if (!this.#currentSession || this.#currentSession.id !== sessionId)
 					throw new Error(`Invalid session: ${sessionId}`)
 
@@ -422,7 +422,7 @@ export default class ActionRecorder extends CoreBase {
 	 * @param {string} setId The action-set to write to (if applicable)
 	 * @param {string} mode 'replace' or 'append'
 	 */
-	saveToControlId(controlId: string, stepId: string, setId: string, mode: 'replace' | 'append'): void {
+	saveToControlId(controlId: string, stepId: number, setId: string, mode: 'replace' | 'append'): void {
 		if (mode !== 'replace' && mode !== 'append') throw new Error(`Invalid mode: ${mode}`)
 
 		const control = this.controls.getControl(controlId)

@@ -58,7 +58,7 @@ import {
 import type FragmentFeedbacks from '../Controls/Fragments/FragmentFeedbacks.js'
 import type FragmentActions from '../Controls/Fragments/FragmentActions.js'
 import type { Request, Response } from 'express'
-import type Respawn from 'respawn'
+import type { RespawnMonitor } from 'respawn'
 import { InstanceStoreConfig } from './Controller.js'
 
 class SocketEventsHandler {
@@ -74,7 +74,7 @@ class SocketEventsHandler {
 	ipcWrapper: IpcWrapper<HostToModuleEventsV0, ModuleToHostEventsV0>
 	unsubListeners: () => void
 
-	constructor(registry: Registry, instanceStatus: InstanceStatuses, monitor: Respawn, connectionId: string) {
+	constructor(registry: Registry, instanceStatus: InstanceStatuses, monitor: RespawnMonitor, connectionId: string) {
 		this.logger = LogController.createLogger(`Instance/Wrapper/${connectionId}`)
 
 		this.registry = registry
@@ -110,13 +110,17 @@ class SocketEventsHandler {
 			5000
 		)
 
+		if (!monitor.child) throw new Error('Child is not running!')
+
 		const messageHandler = (msg: any) => {
 			this.ipcWrapper.receivedMessage(msg)
 		}
 		monitor.child.on('message', messageHandler)
 
 		this.unsubListeners = () => {
-			monitor.child.off('message', messageHandler)
+			if (monitor.child) {
+				monitor.child.off('message', messageHandler)
+			}
 		}
 	}
 

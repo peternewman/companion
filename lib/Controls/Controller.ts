@@ -370,7 +370,7 @@ class ControlsController extends CoreBase {
 
 		client.onPromise(
 			'controls:action:add',
-			(controlId: string, stepId: string, setId: string, instanceId: string, actionId: string) => {
+			(controlId: string, stepId: number, setId: string, instanceId: string, actionId: string) => {
 				const control = this.getControl(controlId)
 				if (!control) return false
 
@@ -387,7 +387,7 @@ class ControlsController extends CoreBase {
 			}
 		)
 
-		client.onPromise('controls:action:learn', (controlId: string, stepId: string, setId: string, id: string) => {
+		client.onPromise('controls:action:learn', (controlId: string, stepId: number, setId: string, id: string) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -400,7 +400,7 @@ class ControlsController extends CoreBase {
 
 		client.onPromise(
 			'controls:action:enabled',
-			(controlId: string, stepId: string, setId: string, id: string, enabled: boolean) => {
+			(controlId: string, stepId: number, setId: string, id: string, enabled: boolean) => {
 				const control = this.getControl(controlId)
 				if (!control) return false
 
@@ -412,7 +412,7 @@ class ControlsController extends CoreBase {
 			}
 		)
 
-		client.onPromise('controls:action:remove', (controlId: string, stepId: string, setId: string, id: string) => {
+		client.onPromise('controls:action:remove', (controlId: string, stepId: number, setId: string, id: string) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -423,7 +423,7 @@ class ControlsController extends CoreBase {
 			}
 		})
 
-		client.onPromise('controls:action:duplicate', (controlId: string, stepId: string, setId: string, id: string) => {
+		client.onPromise('controls:action:duplicate', (controlId: string, stepId: number, setId: string, id: string) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -436,7 +436,7 @@ class ControlsController extends CoreBase {
 
 		client.onPromise(
 			'controls:action:set-delay',
-			(controlId: string, stepId: string, setId: string, id: string, delay: number) => {
+			(controlId: string, stepId: number, setId: string, id: string, delay: number) => {
 				const control = this.getControl(controlId)
 				if (!control) return false
 
@@ -450,7 +450,7 @@ class ControlsController extends CoreBase {
 
 		client.onPromise(
 			'controls:action:set-option',
-			(controlId: string, stepId: string, setId: string, id: string, key: string, value: any) => {
+			(controlId: string, stepId: number, setId: string, id: string, key: string, value: any) => {
 				const control = this.getControl(controlId)
 				if (!control) return false
 
@@ -482,7 +482,7 @@ class ControlsController extends CoreBase {
 				}
 			}
 		)
-		client.onPromise('controls:action-set:add', (controlId: string, stepId: string) => {
+		client.onPromise('controls:action-set:add', (controlId: string, stepId: number) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -492,7 +492,7 @@ class ControlsController extends CoreBase {
 				throw new Error(`Control "${controlId}" does not support this operation`)
 			}
 		})
-		client.onPromise('controls:action-set:remove', (controlId: string, stepId: string, setId: string) => {
+		client.onPromise('controls:action-set:remove', (controlId: string, stepId: number, setId: string) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -505,7 +505,7 @@ class ControlsController extends CoreBase {
 
 		client.onPromise(
 			'controls:action-set:rename',
-			(controlId: string, stepId: string, oldSetId: string, newSetId: string) => {
+			(controlId: string, stepId: number, oldSetId: string, newSetId: string) => {
 				const control = this.getControl(controlId)
 				if (!control) return false
 
@@ -519,7 +519,7 @@ class ControlsController extends CoreBase {
 
 		client.onPromise(
 			'controls:action-set:set-run-while-held',
-			(controlId: string, stepId: string, setId: string, runWhileHeld: boolean) => {
+			(controlId: string, stepId: number, setId: string, runWhileHeld: boolean) => {
 				const control = this.getControl(controlId)
 				if (!control) return false
 
@@ -541,7 +541,7 @@ class ControlsController extends CoreBase {
 				throw new Error(`Control "${controlId}" does not support steps`)
 			}
 		})
-		client.onPromise('controls:step:remove', (controlId: string, stepId: string) => {
+		client.onPromise('controls:step:remove', (controlId: string, stepId: number) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 
@@ -563,7 +563,7 @@ class ControlsController extends CoreBase {
 			}
 		})
 
-		client.onPromise('controls:step:set-next', (controlId: string, stepId: string) => {
+		client.onPromise('controls:step:set-next', (controlId: string, stepId: number) => {
 			const control = this.getControl(controlId)
 			if (!control) return false
 

@@ -1,6 +1,6 @@
 import LogController, { ChildLogger } from '../Log/Controller.js'
 import PQueue from 'p-queue'
-import Respawn from 'respawn'
+import Respawn, { RespawnMonitor } from 'respawn'
 import { nanoid } from 'nanoid'
 import path from 'path'
 import semver from 'semver'
@@ -52,7 +52,7 @@ interface ModuleChild {
 
 	restartCount: number
 	crashed?: NodeJS.Timer
-	monitor?: Respawn
+	monitor?: RespawnMonitor
 }
 
 class ModuleHost {
@@ -95,6 +95,13 @@ class ModuleHost {
 
 		const initHandler = (msg: any) => {
 			if (msg.direction === 'call' && msg.name === 'register' && msg.callbackId && msg.payload) {
+				if (!child.monitor?.child) {
+					this.logger.debug(`Received init when module is not running!`)
+
+					forceRestart()
+					return
+				}
+
 				const { apiVersion, connectionId, verificationToken } = ejson.parse(msg.payload)
 				if (!child.skipApiVersionCheck && !validApiRange.test(apiVersion)) {
 					this.logger.debug(`Got register for unsupported api version "${apiVersion}" connectionId: "${connectionId}"`)
@@ -147,7 +154,7 @@ class ModuleHost {
 				// TODO module-lib - start pings
 
 				// Init module
-				this.registry.instance.status.updateInstanceStatus(connectionId, 'initializing')
+				this.registry.instance.status.updateInstanceStatus(connectionId, 'initializing', undefined)
 
 				child.handler
 					.init(config)
@@ -170,7 +177,7 @@ class ModuleHost {
 					})
 			}
 		}
-		child.monitor.on('message', initHandler)
+		child.monitor?.on('message', initHandler)
 	}
 
 	/**
@@ -272,7 +279,7 @@ class ModuleHost {
 			if (child.monitor) {
 				// Stop the child process
 				const monitor = child.monitor
-				await new Promise((resolve) => monitor.stop(resolve))
+				await new Promise<void>((resolve) => monitor.stop(resolve))
 			}
 
 			if (allowDeleteIfEmpty && child.lifeCycleQueue.size === 0) {

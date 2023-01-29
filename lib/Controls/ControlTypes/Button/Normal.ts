@@ -156,7 +156,7 @@ export default class ControlButtonNormal
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionAdd(stepId: string, setId: string, actionItem: ActionInstance): boolean {
+	actionAdd(stepId: number, setId: string, actionItem: ActionInstance): boolean {
 		const step = this.steps[stepId]
 		if (step) {
 			return step.actionAdd(setId, actionItem)
@@ -172,7 +172,7 @@ export default class ControlButtonNormal
 	 * @param {Array} newActions actions to append
 	 * @access public
 	 */
-	actionAppend(stepId: string, setId: string, newActions: ActionInstance[]) {
+	actionAppend(stepId: number, setId: string, newActions: ActionInstance[]) {
 		const step = this.steps[stepId]
 		if (step) {
 			return step.actionAppend(setId, newActions)
@@ -189,7 +189,7 @@ export default class ControlButtonNormal
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionDuplicate(stepId: string, setId: string, id: string) {
+	actionDuplicate(stepId: number, setId: string, id: string) {
 		const step = this.steps[stepId]
 		if (step) {
 			return step.actionDuplicate(setId, id)
@@ -206,7 +206,7 @@ export default class ControlButtonNormal
 	 * @param {boolean} enabled
 	 * @access public
 	 */
-	actionEnabled(stepId: string, setId: string, id: string, enabled: boolean): boolean {
+	actionEnabled(stepId: number, setId: string, id: string, enabled: boolean): boolean {
 		const step = this.steps[stepId]
 		if (step) {
 			return step.actionEnabled(setId, id, enabled)
@@ -223,7 +223,7 @@ export default class ControlButtonNormal
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	async actionLearn(stepId: string, setId: string, id: string) {
+	async actionLearn(stepId: number, setId: string, id: string) {
 		const step = this.steps[stepId]
 		if (step) {
 			return step.actionLearn(setId, id)
@@ -240,7 +240,7 @@ export default class ControlButtonNormal
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionRemove(stepId: string, setId: string, id: string) {
+	actionRemove(stepId: number, setId: string, id: string) {
 		const step = this.steps[stepId]
 		if (step) {
 			return step.actionRemove(setId, id)
@@ -303,7 +303,7 @@ export default class ControlButtonNormal
 	 * @param {Array} newActions actions to populate
 	 * @access public
 	 */
-	actionReplaceAll(stepId: string, setId: string, newActions: ActionInstance[]) {
+	actionReplaceAll(stepId: number, setId: string, newActions: ActionInstance[]) {
 		const step = this.steps[stepId]
 		if (step) {
 			return step.actionReplaceAll(setId, newActions)
@@ -321,7 +321,7 @@ export default class ControlButtonNormal
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionSetDelay(stepId: string, setId: string, id: string, delay: number) {
+	actionSetDelay(stepId: number, setId: string, id: string, delay: number) {
 		const step = this.steps[stepId]
 		if (step) {
 			return step.actionSetDelay(setId, id, delay)
@@ -340,7 +340,7 @@ export default class ControlButtonNormal
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionSetOption(stepId: string, setId: string, id: string, key: string, value: any) {
+	actionSetOption(stepId: number, setId: string, id: string, key: string, value: any) {
 		const step = this.steps[stepId]
 		if (step) {
 			return step.actionSetOption(setId, id, key, value)
@@ -354,7 +354,7 @@ export default class ControlButtonNormal
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionSetAdd(stepId: string) {
+	actionSetAdd(stepId: number) {
 		const step = this.steps[stepId]
 		if (step) {
 			let redraw = false
@@ -387,7 +387,7 @@ export default class ControlButtonNormal
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionSetRemove(stepId: string, setId: string) {
+	actionSetRemove(stepId: number, setId: string) {
 		// Ensure valid
 		if (isNaN(Number(setId))) return false
 
@@ -433,7 +433,7 @@ export default class ControlButtonNormal
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	actionSetRename(stepId: string, oldSetId0: string, newSetId0: string) {
+	actionSetRename(stepId: number, oldSetId0: string, newSetId0: string) {
 		const step = this.steps[stepId]
 		if (step) {
 			const oldSetId = Number(oldSetId0)
@@ -464,7 +464,7 @@ export default class ControlButtonNormal
 		return false
 	}
 
-	actionSetRunWhileHeld(stepId: string, setId0: string, runWhileHeld: boolean) {
+	actionSetRunWhileHeld(stepId: number, setId0: string, runWhileHeld: boolean) {
 		const step = this.steps[stepId]
 		if (step) {
 			// Ensure it is a number
@@ -767,7 +767,7 @@ export default class ControlButtonNormal
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	stepRemove(stepId: string) {
+	stepRemove(stepId: number) {
 		const oldKeys = GetStepIds(this.steps)
 
 		if (oldKeys.length > 1) {
@@ -806,7 +806,7 @@ export default class ControlButtonNormal
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	stepSelectNext(stepId: string) {
+	stepSelectNext(stepId: number) {
 		if (this.steps[stepId]) {
 			// Ensure it isn't currently pressed
 			this.setPushed(false, undefined)
