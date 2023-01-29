@@ -1,3 +1,4 @@
+import { Registry } from '../tmp.js'
 import ServiceApi from './Api.js'
 import ServiceArtnet from './Artnet.js'
 import ServiceElgatoPlugin from './ElgatoPlugin.js'
@@ -31,11 +32,23 @@ import ServiceUdp from './Udp.js'
  * disclosing the source code of your own applications.
  */
 class ServiceController {
+	https: ServiceHttps
+	oscSender: ServiceOscSender
+	oscListener: ServiceOscListener
+	api: ServiceApi
+	tcp: ServiceTcp
+	udp: ServiceUdp
+	emberplus: ServiceEmberPlus
+	artnet: ServiceArtnet
+	rosstalk: ServiceRosstalk
+	satellite: ServiceSatellite
+	elgatoPlugin: ServiceElgatoPlugin
+
 	/**
 	 * @param {Registry} registry - the application core
 	 */
-	constructor(registry) {
-		this.https = new ServiceHttps(registry, registry.ui.express, registry.io)
+	constructor(registry: Registry) {
+		this.https = new ServiceHttps(registry, registry.ui.express)
 		this.oscSender = new ServiceOscSender(registry)
 		this.oscListener = new ServiceOscListener(registry)
 		this.api = new ServiceApi(registry)
@@ -54,7 +67,7 @@ class ServiceController {
 	 * @param {(boolean|number|string)} value - the new value
 	 * @access public
 	 */
-	updateUserConfig(key, value) {
+	updateUserConfig(key: string, value: any) {
 		this.artnet.updateUserConfig(key, value)
 		this.elgatoPlugin.updateUserConfig(key, value)
 		this.emberplus.updateUserConfig(key, value)

@@ -1,4 +1,6 @@
-import OSC from 'osc'
+import { OSCSomeArguments } from '@companion-module/base'
+import { OscMessage } from 'osc'
+import { Registry } from '../tmp.js'
 import ServiceOscBase from './OscBase.js'
 
 /**
@@ -33,8 +35,8 @@ class ServiceOscSender extends ServiceOscBase {
 	/**
 	 * @param {Registry} registry - the application core
 	 */
-	constructor(registry) {
-		super(registry, 'osc-tx', 'Service/OscSender')
+	constructor(registry: Registry) {
+		super(registry, 'osc-tx', 'Service/OscSender', undefined, undefined)
 
 		this.init()
 	}
@@ -44,7 +46,9 @@ class ServiceOscSender extends ServiceOscBase {
 	 * @param {string} message - the incoming message part
 	 * @access protected
 	 */
-	processIncoming(message) {}
+	processIncoming(_message: OscMessage): void {
+		// Ignore
+	}
 
 	/**
 	 * Send an OSC command to a host
@@ -54,7 +58,7 @@ class ServiceOscSender extends ServiceOscBase {
 	 * @param {?ServiceOscSender~CompanionOSCArgument[]} args - arguments to include
 	 * @access public
 	 */
-	send(host, port, path, args) {
+	send(host: string, port: number, path: string, args: OSCSomeArguments): void {
 		if (this.server !== undefined) {
 			this.server.send(
 				{
@@ -67,26 +71,26 @@ class ServiceOscSender extends ServiceOscBase {
 		}
 	}
 
-	/**
-	 * Send multiple OSC commands to a host
-	 * @param {string} host - the receiving host
-	 * @param {number} port - the receiving port
-	 * @param {number} time - OSC 64-bit time tag (see OSC specification); <code>0</code> to send immediately
-	 * @param {ServiceOscSender~CompanionOSCBundle[]} bundle - the packages to send
-	 * @access public
-	 */
-	sendBundle(host, port, time, bundle) {
-		if (this.server !== undefined && bundle !== undefined) {
-			this.server.send(
-				{
-					timeTag: OSC.timeTag(time),
-					packets: bundle,
-				},
-				host,
-				port
-			)
-		}
-	}
+	// /**
+	//  * Send multiple OSC commands to a host
+	//  * @param {string} host - the receiving host
+	//  * @param {number} port - the receiving port
+	//  * @param {number} time - OSC 64-bit time tag (see OSC specification); <code>0</code> to send immediately
+	//  * @param {ServiceOscSender~CompanionOSCBundle[]} bundle - the packages to send
+	//  * @access public
+	//  */
+	// sendBundle(host:string, port:number, time:number, bundle) {
+	// 	if (this.server !== undefined && bundle !== undefined) {
+	// 		this.server.send(
+	// 			{
+	// 				timeTag: OSC.timeTag(time),
+	// 				packets: bundle,
+	// 			},
+	// 			host,
+	// 			port
+	// 		)
+	// 	}
+	// }
 }
 
 /**

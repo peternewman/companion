@@ -1,5 +1,6 @@
 import { CreateBankControlId } from '../Shared/ControlId.js'
-import ServiceTcpBase from './TcpBase.js'
+import { Registry } from '../tmp.js'
+import ServiceTcpBase, { SocketExt } from './TcpBase.js'
 
 /**
  * Class providing the Rosstalk api.
@@ -25,26 +26,18 @@ import ServiceTcpBase from './TcpBase.js'
  */
 class ServiceRosstalk extends ServiceTcpBase {
 	/**
-	 * The port to open the socket with.  Default: <code>7788</code>
-	 * @type {number}
-	 * @access protected
-	 */
-	port = 7788
-	/**
 	 * The time to auto-release the button since this can only
 	 * receive presses.  Default: <code>20 ms</code>
-	 * @type {number}
-	 * @access protected
 	 */
-	releaseTime = 20
+	private releaseTime = 20 as const
 
 	/**
 	 * @param {Registry} registry - the application core
 	 */
-	constructor(registry) {
-		super(registry, 'rosstalk', 'Service/Rosstalk', 'rosstalk_enabled')
+	constructor(registry: Registry) {
+		super(registry, 'rosstalk', 'Service/Rosstalk', 'rosstalk_enabled', undefined)
 
-		this.releaseTime = 20 // ms to send button release
+		this.port = 7788
 	}
 
 	/**
@@ -53,7 +46,7 @@ class ServiceRosstalk extends ServiceTcpBase {
 	 * @param {string} data - the incoming message part
 	 * @access protected
 	 */
-	processIncoming(client, data) {
+	processIncoming(_client: SocketExt, data: string) {
 		// Type, bank/page, CC/bnt number
 		const match = data.match(/(CC) ([0-9]*)\:([0-9]*)/)
 		if (match === null) {

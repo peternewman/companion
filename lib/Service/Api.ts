@@ -1,5 +1,6 @@
 import CoreBase from '../Core/Base.js'
 import { CreateBankControlId } from '../Shared/ControlId.js'
+import { Registry } from '../tmp.js'
 import RegexRouter from './RegexRouter.js'
 
 /**
@@ -29,17 +30,16 @@ class ServiceApi extends CoreBase {
 	 * @type {RegexRouter}
 	 * @access private
 	 */
-	#router
+	#router = new RegexRouter<[], string | void>(() => {
+		throw new ApiMessageError('Syntax error')
+	})
 
 	/**
 	 * @param {Registry} registry - the core registry
 	 */
-	constructor(registry) {
+	constructor(registry: Registry) {
 		super(registry, 'api', 'Service/Api')
 
-		this.#router = new RegexRouter(() => {
-			throw new ApiMessageError('Syntax error')
-		})
 		this.#setupRoutes()
 	}
 
@@ -74,13 +74,13 @@ class ServiceApi extends CoreBase {
 
 			this.logger.info(`Got bank-press (trigger) ${controlId}`)
 
-			if (!this.controls.pressControl(controlId, true)) {
+			if (!this.controls.pressControl(controlId, true, undefined)) {
 				throw new ApiMessageError('Page/bank out of range')
 			}
 
 			setTimeout(() => {
 				this.logger.info(`Auto releasing bank-press ${controlId}`)
-				this.controls.pressControl(controlId, false)
+				this.controls.pressControl(controlId, false, undefined)
 			}, 20)
 		})
 
@@ -89,7 +89,7 @@ class ServiceApi extends CoreBase {
 
 			this.logger.info(`Got bank-down (trigger) ${controlId}`)
 
-			if (!this.controls.pressControl(controlId, true)) {
+			if (!this.controls.pressControl(controlId, true, undefined)) {
 				throw new ApiMessageError('Page/bank out of range')
 			}
 		})
@@ -99,7 +99,7 @@ class ServiceApi extends CoreBase {
 
 			this.logger.info(`Got bank-up (trigger) ${controlId}`)
 
-			if (!this.controls.pressControl(controlId, false)) {
+			if (!this.controls.pressControl(controlId, false, undefined)) {
 				throw new ApiMessageError('Page/bank out of range')
 			}
 		})
@@ -148,17 +148,15 @@ class ServiceApi extends CoreBase {
 			}
 		})
 
-		this.#router.addPath('rescan', async () => {
+		this.#router.addPath('rescan', () => {
 			this.logger.debug('Rescanning USB')
 
-			try {
-				await this.surfaces.triggerRefreshDevices()
-			} catch (e) {
+			this.surfaces.triggerRefreshDevices().catch(() => {
 				throw new ApiMessageError('Scan failed')
-			}
+			})
 		})
 
-		this.#router.addPath('custom-variable :name set-value :value(.*)', async () => {
+		this.#router.addPath('custom-variable :name set-value :value(.*)', (match) => {
 			const result = this.instance.variable.custom.setValue(match.name, match.value)
 			if (result) {
 				throw new ApiMessageError(result)
@@ -171,7 +169,7 @@ class ServiceApi extends CoreBase {
 	 * @param {string} data - the raw command
 	 * @param {?unction} response_cb - response data for the client
 	 */
-	async parseApiCommand(data) {
+	async parseApiCommand(data: string): Promise<string | undefined | void> {
 		data = data.trim()
 		this.logger.silly(`API parsing command: ${data}`)
 
@@ -180,7 +178,7 @@ class ServiceApi extends CoreBase {
 }
 
 export class ApiMessageError extends Error {
-	constructor(message) {
+	constructor(message: string) {
 		super(message)
 	}
 }

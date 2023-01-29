@@ -1,4 +1,5 @@
 import CoreBase from '../Core/Base.js'
+import { Registry } from '../tmp.js'
 
 /**
  * Abstract class providing base functionality for services.
@@ -22,7 +23,7 @@ import CoreBase from '../Core/Base.js'
  * develop commercial activities involving the Companion software without
  * disclosing the source code of your own applications.
  */
-class ServiceBase extends CoreBase {
+abstract class ServiceBase<TServer extends { close(): void }> extends CoreBase {
 	/**
 	 * Flag to track if the module is currently enabled
 	 * @type {boolean}
@@ -34,7 +35,7 @@ class ServiceBase extends CoreBase {
 	 * @type {?string}
 	 * @access protected
 	 */
-	enableConfig
+	enableConfig: string | undefined
 	/**
 	 * Flag to track if the module is setup and ready to be enabled
 	 * @type {boolean}
@@ -46,7 +47,11 @@ class ServiceBase extends CoreBase {
 	 * @type {?number}
 	 * @access protected
 	 */
-	portConfig
+	portConfig: string | undefined
+
+	port!: number
+
+	server: TServer | undefined
 
 	/**
 	 * This needs to be called in the extending class
@@ -57,7 +62,13 @@ class ServiceBase extends CoreBase {
 	 * @param {?string} enableConfig - the key for the userconfig that sets if the module is enabled or disabled
 	 * @param {?number} portConfig - the key for the userconfig that sets the service ports
 	 */
-	constructor(registry, logSource, debugNamespace, enableConfig, portConfig) {
+	constructor(
+		registry: Registry,
+		logSource: string,
+		debugNamespace: string,
+		enableConfig: string | undefined,
+		portConfig: string | undefined
+	) {
 		super(registry, logSource, debugNamespace)
 
 		this.enableConfig = enableConfig
@@ -69,21 +80,23 @@ class ServiceBase extends CoreBase {
 	 * @access protected
 	 */
 	close() {
-		this.server.close()
+		if (this.server) {
+			this.server.close()
+		}
 	}
 
 	/**
 	 * Kill the socket, if exists.
 	 * @access protected
 	 */
-	disableModule() {
+	disableModule(): void {
 		if (this.server) {
 			try {
 				this.currentState = false
 				this.close()
 				this.logger.info(`Stopped listening on port ${this.port}`)
 				delete this.server
-			} catch (e) {
+			} catch (e: any) {
 				this.logger.silly(`Could not stop listening: ${e.message}`)
 			}
 		}
@@ -93,11 +106,11 @@ class ServiceBase extends CoreBase {
 	 * Call to enable the socket if the module is initialized.
 	 * @access protected
 	 */
-	enableModule() {
+	enableModule(): void {
 		if (this.initialized === true) {
 			try {
 				this.listen()
-			} catch (e) {
+			} catch (e: any) {
 				this.logger.error(`Error listening: ${e.message}`)
 			}
 		}
@@ -108,7 +121,7 @@ class ServiceBase extends CoreBase {
 	 * @param {Error} e - the error
 	 * @access protected
 	 */
-	handleSocketError(e) {
+	handleSocketError(e: any): void {
 		let message
 		let disable = false
 
@@ -152,13 +165,13 @@ class ServiceBase extends CoreBase {
 	 * @access protected
 	 * @abstract
 	 */
-	listen() {}
+	abstract listen(): void
 
 	/**
 	 * Stop and restart the module, if enabled.
 	 * @access protected
 	 */
-	restartModule() {
+	restartModule(): void {
 		this.disableModule()
 
 		if (
@@ -175,7 +188,7 @@ class ServiceBase extends CoreBase {
 	 * @param {(boolean|number|string)} value - the saved value
 	 * @access public
 	 */
-	updateUserConfig(key, value) {
+	updateUserConfig(key: string, value: any): void {
 		if (this.enableConfig !== undefined && key == this.enableConfig) {
 			if (this.currentState == false && value == true) {
 				this.enableModule()

@@ -1,5 +1,7 @@
 import ServiceUdpBase from './UdpBase.js'
 import { CreateBankControlId } from '../Shared/ControlId.js'
+import { Registry } from '../tmp.js'
+import { RemoteInfo } from 'dgram'
 
 /**
  * Class providing the Artnet api.
@@ -23,22 +25,17 @@ import { CreateBankControlId } from '../Shared/ControlId.js'
  * disclosing the source code of your own applications.
  */
 class ServiceArtnet extends ServiceUdpBase {
-	/**
-	 * The port to open the socket with.  Default: <code>6454</code>
-	 * @type {number}
-	 * @access protected
-	 */
-	port = 6454
+	currentPage = 0
+	currentBank = 0
+	currentDir = 0
 
 	/**
 	 * @param {Registry} registry - the application core
 	 */
-	constructor(registry) {
-		super(registry, 'artnet', 'Service/Artnet', 'artnet_enabled')
+	constructor(registry: Registry) {
+		super(registry, 'artnet', 'Service/Artnet', 'artnet_enabled', undefined)
 
-		this.currentPage = 0
-		this.currentBank = 0
-		this.currentDir = 0
+		this.port = 6454
 
 		this.init()
 	}
@@ -48,19 +45,19 @@ class ServiceArtnet extends ServiceUdpBase {
 	 * @param {Buffer} data - the incoming message
 	 * @param {ServiceUdpBase~DgramRemoteInfo} remote - remote address information
 	 */
-	processIncoming(data, remote) {
+	processIncoming(data: Buffer, _remote: RemoteInfo): void {
 		try {
 			if (data.length >= 18 + 255) {
-				let sequence = data.readUInt8(12, true)
-				let physical = data.readUInt8(13, true)
-				let universe = data.readUInt8(14, true)
-				let offset = data.readUInt8(16, true)
-				let length = data.readUInt8(17, true)
+				let sequence = data.readUInt8(12)
+				let physical = data.readUInt8(13)
+				let universe = data.readUInt8(14)
+				// let offset = data.readUInt8(16)
+				let length = data.readUInt8(17)
 
 				let rawData = []
 
-				for (i = 18; i < 18 + 255; i++) {
-					rawData.push(data.readUInt8(i, true))
+				for (let i = 18; i < 18 + 255; i++) {
+					rawData.push(data.readUInt8(i))
 				}
 
 				let packet = {
@@ -71,15 +68,15 @@ class ServiceArtnet extends ServiceUdpBase {
 					data: rawData,
 				}
 
-				if (parseInt(packet.universe) === this.userconfig.getKey('artnet_universe')) {
-					let ch = this.userconfig.getKey('artnet_channel')
+				if (Number(packet.universe) === Number(this.userconfig.getKey('artnet_universe'))) {
+					let ch = Number(this.userconfig.getKey('artnet_channel'))
 					if (ch >= 1) {
 						ch -= 1
 					}
 
-					let dmxPage = parseInt(packet.data[ch])
-					let dmxBank = parseInt(packet.data[ch + 1])
-					let dmxDir = parseInt(packet.data[ch + 2])
+					let dmxPage = Number(packet.data[ch])
+					let dmxBank = Number(packet.data[ch + 1])
+					let dmxDir = Number(packet.data[ch + 2])
 
 					if (dmxPage !== this.currentPage || dmxBank !== this.currentBank || dmxDir !== this.currentDir) {
 						this.currentPage = dmxPage
@@ -94,11 +91,11 @@ class ServiceArtnet extends ServiceUdpBase {
 
 						// down
 						if (dmxDir > 128) {
-							this.controls.pressControl(controlId, false)
+							this.controls.pressControl(controlId, false, 'artnet')
 						}
 						// up
 						else if (dmxDir >= 10) {
-							this.controls.pressControl(controlId, true)
+							this.controls.pressControl(controlId, true, 'artnet')
 						}
 						// nothing.
 						else {
@@ -106,7 +103,7 @@ class ServiceArtnet extends ServiceUdpBase {
 					}
 				}
 			}
-		} catch (err) {
+		} catch (err: any) {
 			this.logger.silly(`message error: ${err.toString()}`, err.stack)
 		}
 	}

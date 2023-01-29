@@ -1,6 +1,7 @@
 import { decimalToRgb } from '../Resources/Util.js'
-import { ApiMessageError } from './Api.js'
-import ServiceTcpBase from './TcpBase.js'
+import { Registry } from '../tmp.js'
+import ServiceApi, { ApiMessageError } from './Api.js'
+import ServiceTcpBase, { SocketExt } from './TcpBase.js'
 
 /**
  * Class providing the TCP api.
@@ -29,7 +30,7 @@ class ServiceTcp extends ServiceTcpBase {
 	 * @type {?ServiceApi}
 	 * @access protected
 	 */
-	api
+	private api
 	/**
 	 * The port to open the socket with.  Default: <code>16759</code>
 	 * @type {number}
@@ -41,7 +42,7 @@ class ServiceTcp extends ServiceTcpBase {
 	 * @param {Registry} registry - the application core
 	 * @param {ServiceApi} api - the handler for incoming api commands
 	 */
-	constructor(registry, api) {
+	constructor(registry: Registry, api: ServiceApi) {
 		super(registry, 'tcp', 'Service/Tcp', 'tcp_enabled', 'tcp_listen_port')
 		this.api = api
 
@@ -75,7 +76,7 @@ class ServiceTcp extends ServiceTcpBase {
 	 * @param {string} chunk - the incoming message part
 	 * @access protected
 	 */
-	processIncoming(client, chunk) {
+	processIncoming(client: SocketExt, chunk: string): void {
 		let i = 0,
 			line = '',
 			offset = 0

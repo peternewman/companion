@@ -1,5 +1,6 @@
 import ServiceBase from './Base.js'
-import OSC from 'osc'
+import OSC, { OscMessage } from 'osc'
+import { Registry } from '../tmp.js'
 
 /**
  * Abstract class providing base functionality for OSC services.
@@ -23,7 +24,7 @@ import OSC from 'osc'
  * develop commercial activities involving the Companion software without
  * disclosing the source code of your own applications.
  */
-class ServiceOscBase extends ServiceBase {
+abstract class ServiceOscBase extends ServiceBase<OSC.UDPPort> {
 	/**
 	 * This needs to be called in the extending class
 	 * using <code>super(registry, 'module_name', 'module_path', enableConfig, portConfig)</code>.
@@ -33,7 +34,13 @@ class ServiceOscBase extends ServiceBase {
 	 * @param {?string} enableConfig - the key for the userconfig that sets if the module is enabled or disabled
 	 * @param {?number} portConfig - the key for the userconfig that sets the service ports
 	 */
-	constructor(registry, logSource, debugNamespace, enableConfig, portConfig) {
+	constructor(
+		registry: Registry,
+		logSource: string,
+		debugNamespace: string,
+		enableConfig: string | undefined,
+		portConfig: string | undefined
+	) {
 		super(registry, logSource, debugNamespace, enableConfig, portConfig)
 	}
 
@@ -41,9 +48,9 @@ class ServiceOscBase extends ServiceBase {
 	 * Start the service if it is not already running
 	 * @access protected
 	 */
-	listen() {
+	listen(): void {
 		if (this.portConfig !== undefined) {
-			this.port = this.userconfig.getKey(this.portConfig)
+			this.port = Number(this.userconfig.getKey(this.portConfig))
 		}
 
 		if (this.server === undefined) {
@@ -67,7 +74,7 @@ class ServiceOscBase extends ServiceBase {
 				} else {
 					this.logger.info('Listening on port ' + this.port)
 				}
-			} catch (e) {
+			} catch (e: any) {
 				this.logger.error(`Could not launch: ${e.message}`)
 			}
 		}
@@ -79,7 +86,7 @@ class ServiceOscBase extends ServiceBase {
 	 * @access protected
 	 * @abstract
 	 */
-	processIncoming(message) {}
+	abstract processIncoming(message: OscMessage): void
 }
 
 export default ServiceOscBase

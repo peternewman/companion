@@ -1,5 +1,6 @@
 import ServiceBase from './Base.js'
-import dgram from 'dgram'
+import dgram, { RemoteInfo } from 'dgram'
+import { Registry } from '../tmp.js'
 
 /**
  * Abstract class providing base functionality for UDP services.
@@ -23,7 +24,7 @@ import dgram from 'dgram'
  * develop commercial activities involving the Companion software without
  * disclosing the source code of your own applications.
  */
-class ServiceUdpBase extends ServiceBase {
+abstract class ServiceUdpBase extends ServiceBase<dgram.Socket> {
 	/**
 	 * This needs to be called in the extending class
 	 * using <code>super(registry, 'module_name', 'module_path', enableConfig, portConfig)</code>.
@@ -33,7 +34,13 @@ class ServiceUdpBase extends ServiceBase {
 	 * @param {?string} enableConfig - the key for the userconfig that sets if the module is enabled or disabled
 	 * @param {?number} portConfig - the key for the userconfig that sets the service ports
 	 */
-	constructor(registry, logSource, debugNamespace, enableConfig, portConfig) {
+	constructor(
+		registry: Registry,
+		logSource: string,
+		debugNamespace: string,
+		enableConfig: string | undefined,
+		portConfig: string | undefined
+	) {
 		super(registry, logSource, debugNamespace, enableConfig, portConfig)
 	}
 
@@ -43,7 +50,7 @@ class ServiceUdpBase extends ServiceBase {
 	 */
 	listen() {
 		if (this.portConfig !== undefined) {
-			this.port = this.userconfig.getKey(this.portConfig)
+			this.port = Number(this.userconfig.getKey(this.portConfig))
 		}
 
 		if (this.server === undefined) {
@@ -58,7 +65,7 @@ class ServiceUdpBase extends ServiceBase {
 				this.server.bind(this.port)
 				this.currentState = true
 				this.logger.info('Listening on port ' + this.port)
-			} catch (e) {
+			} catch (e: any) {
 				this.logger.error(`Could not launch: ${e.message}`)
 			}
 		}
@@ -69,7 +76,7 @@ class ServiceUdpBase extends ServiceBase {
 	 * @param {Buffer} data - the incoming message
 	 * @param {ServiceUdpBase~DgramRemoteInfo} remote - remote address information
 	 */
-	processIncoming(data, remote) {}
+	abstract processIncoming(msg: Buffer, rinfo: RemoteInfo): void
 }
 
 /**

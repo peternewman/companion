@@ -1,5 +1,11 @@
 import ServiceBase from './Base.js'
-import net from 'net'
+import net, { Server, Socket } from 'net'
+import { Registry } from '../tmp.js'
+
+export interface SocketExt extends Socket {
+	name: string
+	receiveBuffer: string
+}
 
 /**
  * Abstract class providing base functionality for TCP services.
@@ -23,13 +29,13 @@ import net from 'net'
  * develop commercial activities involving the Companion software without
  * disclosing the source code of your own applications.
  */
-class ServiceTcpBase extends ServiceBase {
+abstract class ServiceTcpBase extends ServiceBase<Server> {
 	/**
 	 * This stored client sockets
 	 * @type {Array<string, Socket>}
 	 * @access protected
 	 */
-	clients = []
+	clients: SocketExt[] = []
 
 	/**
 	 * This needs to be called in the extending class
@@ -40,7 +46,13 @@ class ServiceTcpBase extends ServiceBase {
 	 * @param {?string} enableConfig - the key for the userconfig that sets if the module is enabled or disabled
 	 * @param {?number} portConfig - the key for the userconfig that sets the service ports
 	 */
-	constructor(registry, logSource, debugNamespace, enableConfig, portConfig) {
+	constructor(
+		registry: Registry,
+		logSource: string,
+		debugNamespace: string,
+		enableConfig: string | undefined,
+		portConfig: string | undefined
+	) {
 		super(registry, logSource, debugNamespace, enableConfig, portConfig)
 	}
 
@@ -50,33 +62,35 @@ class ServiceTcpBase extends ServiceBase {
 	 */
 	listen() {
 		if (this.portConfig !== undefined) {
-			this.port = this.userconfig.getKey(this.portConfig)
+			this.port = Number(this.userconfig.getKey(this.portConfig))
 		}
 
 		if (this.server === undefined) {
 			try {
 				this.server = net.createServer((client) => {
+					const clientExt = client as unknown as SocketExt
+
+					clientExt.name = client.remoteAddress + ':' + client.remotePort
+					clientExt.receiveBuffer = ''
+
+					this.clients.push(clientExt)
+
 					client.on('end', () => {
-						this.clients.splice(this.clients.indexOf(client), 1)
-						this.logger.debug('Client disconnected: ' + client.name)
+						this.clients.splice(this.clients.indexOf(clientExt), 1)
+						this.logger.debug('Client disconnected: ' + clientExt.name)
 					})
 
 					client.on('error', () => {
-						this.clients.splice(this.clients.indexOf(client), 1)
-						this.logger.error('Client errored/died: ' + client.name)
+						this.clients.splice(this.clients.indexOf(clientExt), 1)
+						this.logger.error('Client errored/died: ' + clientExt.name)
 					})
 
-					client.name = client.remoteAddress + ':' + client.remotePort
-					this.clients.push(client)
+					this.logger.debug('Client connected: ' + clientExt.name)
 
-					client.receiveBuffer = ''
-
-					this.logger.debug('Client connected: ' + client.name)
-
-					client.on('data', this.processIncoming.bind(this, client))
+					client.on('data', this.processIncoming.bind(this, clientExt))
 
 					if (this.initSocket !== undefined && typeof this.initSocket == 'function') {
-						this.initSocket(client)
+						this.initSocket(clientExt)
 					}
 				})
 
@@ -85,7 +99,7 @@ class ServiceTcpBase extends ServiceBase {
 				this.server.listen(this.port)
 				this.currentState = true
 				this.logger.info('Listening on port ' + this.port)
-			} catch (e) {
+			} catch (e: any) {
 				this.logger.error(`Could not launch: ${e.message}`)
 			}
 		}
@@ -98,7 +112,9 @@ class ServiceTcpBase extends ServiceBase {
 	 * @access protected
 	 * @abstract
 	 */
-	processIncoming(client, chunk) {}
+	abstract processIncoming(client: SocketExt, chunk: string): void
+
+	initSocket?(client: SocketExt): void
 }
 
 export default ServiceTcpBase
