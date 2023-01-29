@@ -23,7 +23,7 @@ import got from 'got'
 interface MetricsPayload {
 	i: string
 	r: number
-	m: number
+	m: Record<string, number>
 	d: string[]
 }
 

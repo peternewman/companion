@@ -22,8 +22,7 @@ import LogController, { ChildLogger } from '../../Log/Controller.js'
 import { EventEmitter } from 'eventemitter3'
 import { fileURLToPath } from 'url'
 import { isPackaged } from '../../Resources/Util.js'
-import { ISurface, ISurfaceEvents, SurfaceConfig, SurfaceDrawStyle, SurfaceInfo } from '../info.js'
-import { MAX_BUTTONS, MAX_BUTTONS_PER_ROW } from '../../Resources/Constants.js'
+import type { ISurface, ISurfaceEvents, SurfaceConfig, SurfaceDrawStyle, SurfaceInfo } from '../info.js'
 
 class SurfaceUSBController extends EventEmitter<ISurfaceEvents> implements ISurface {
 	static async openDevice(type: string, devicepath: string): Promise<SurfaceUSBController> {
@@ -39,8 +38,6 @@ class SurfaceUSBController extends EventEmitter<ISurfaceEvents> implements ISurf
 				stdio: 'inherit',
 				env: {
 					ELECTRON_RUN_AS_NODE: '1',
-					MAX_BUTTONS: MAX_BUTTONS + '',
-					MAX_BUTTONS_PER_ROW: MAX_BUTTONS_PER_ROW + '',
 				},
 			}
 		)
@@ -91,7 +88,7 @@ class SurfaceUSBController extends EventEmitter<ISurfaceEvents> implements ISurf
 
 		this.childId = '0' // The id of the instance inside the fork. We only put one per fork, so can hardcode the id
 
-		this.logger = LogController.createLogger(`Surface/USB/${type}/${info.serialnumber}`)
+		this.logger = LogController.createLogger(`Surface/USB/${type}/${info.deviceId}`)
 		this.info = info
 
 		this.logger.debug('device added successfully')

@@ -16,6 +16,8 @@ export type SurfaceConfig = Partial<{
 	brightness: number
 	rotation: 0 | 90 | 180 | -90
 
+	illuminate_pressed: boolean
+
 	emulator_control_enable: boolean
 	emulator_prompt_fullscreen: boolean
 }>

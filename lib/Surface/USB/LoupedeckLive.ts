@@ -15,13 +15,31 @@
  *
  */
 
-import { LoupedeckModelId, openLoupedeck } from '@loupedeck/node'
-import util from 'util'
+import {
+	LoupedeckBufferFormat,
+	LoupedeckDevice,
+	LoupedeckDisplayId,
+	LoupedeckModelId,
+	openLoupedeck,
+} from '@loupedeck/node'
 import ImageWriteQueue from '../../Resources/ImageWriteQueue.js'
-const setTimeoutPromise = util.promisify(setTimeout)
 import sharp from 'sharp'
+import type { LoupedeckControlInfo } from '@loupedeck/node/dist/events.js'
+import type { IpcWrapper, SurfaceChild, SurfaceConfig, SurfaceDrawStyle, SurfaceInfo } from './Common.js'
 
-const loupedeckLiveInfo = {
+interface LoupedeckModelInfo {
+	totalCols: number
+	totalRows: number
+
+	lcdCols: number
+	lcdRows: number
+	lcdXOffset: number
+
+	encoders: number[]
+	buttons: number[]
+}
+
+const loupedeckLiveInfo: LoupedeckModelInfo = {
 	totalCols: 8,
 	totalRows: 4,
 
@@ -32,7 +50,7 @@ const loupedeckLiveInfo = {
 	encoders: [0, 8, 16, 7, 15, 23],
 	buttons: [24, 25, 26, 27, 28, 29, 30, 31],
 }
-const loupedeckLiveSInfo = {
+const loupedeckLiveSInfo: LoupedeckModelInfo = {
 	totalCols: 7,
 	totalRows: 3,
 
@@ -44,7 +62,7 @@ const loupedeckLiveSInfo = {
 	buttons: [14, 6, 13, 20],
 }
 
-function colorToRgb(dec) {
+function colorToRgb(dec: number) {
 	const r = Math.round((dec & 0xff0000) >> 16)
 	const g = Math.round((dec & 0x00ff00) >> 8)
 	const b = Math.round(dec & 0x0000ff)
@@ -52,7 +70,7 @@ function colorToRgb(dec) {
 	return { r, g, b }
 }
 
-function buttonToIndex(modelInfo, info) {
+function buttonToIndex(modelInfo: LoupedeckModelInfo, info: LoupedeckControlInfo): number | undefined {
 	const index = modelInfo.buttons[info.index]
 	if (info.type === 'button' && index !== undefined) {
 		return index
@@ -60,13 +78,13 @@ function buttonToIndex(modelInfo, info) {
 
 	return undefined
 }
-const translateTouchKeyIndex = (modelInfo, key) => {
+const translateTouchKeyIndex = (modelInfo: LoupedeckModelInfo, key: number): number => {
 	const x = key % modelInfo.lcdCols
 	const y = Math.floor(key / modelInfo.lcdCols)
 	return y * modelInfo.totalCols + x + modelInfo.lcdXOffset
 }
 
-function rotaryToButtonIndex(modelInfo, info) {
+function rotaryToButtonIndex(modelInfo: LoupedeckModelInfo, info: LoupedeckControlInfo): number | undefined {
 	const index = modelInfo.encoders[info.index]
 	if (info.type === 'rotary' && index !== undefined) {
 		return index
@@ -75,8 +93,23 @@ function rotaryToButtonIndex(modelInfo, info) {
 	return undefined
 }
 
-class SurfaceUSBLoupedeckLive {
-	constructor(ipcWrapper, devicepath, loupedeck, modelInfo, serialnumber) {
+class SurfaceUSBLoupedeckLive implements SurfaceChild {
+	private readonly ipcWrapper: IpcWrapper
+	private readonly loupedeck: LoupedeckDevice
+	private readonly modelInfo: LoupedeckModelInfo
+
+	private readonly write_queue: ImageWriteQueue
+
+	config: SurfaceConfig
+	info: SurfaceInfo
+
+	constructor(
+		ipcWrapper: IpcWrapper,
+		devicepath: string,
+		loupedeck: LoupedeckDevice,
+		modelInfo: LoupedeckModelInfo,
+		serialnumber: string
+	) {
 		this.ipcWrapper = ipcWrapper
 		this.loupedeck = loupedeck
 		this.modelInfo = modelInfo
@@ -94,6 +127,7 @@ class SurfaceUSBLoupedeckLive {
 			keysPerRow: this.modelInfo.totalCols,
 			keysTotal: this.modelInfo.totalCols * this.modelInfo.totalRows,
 			deviceId: `loupedeck:${serialnumber}`,
+			location: '',
 		}
 
 		this.loupedeck.on('error', (error) => {
@@ -170,16 +204,16 @@ class SurfaceUSBLoupedeckLive {
 				const y = Math.floor(key / this.modelInfo.lcdCols) * 90
 
 				await this.loupedeck.drawBuffer(
-					'center',
+					LoupedeckDisplayId.Center,
 					newbuffer,
-					'rgb',
+					LoupedeckBufferFormat.RGB,
 					width,
 					height,
 					x + (90 - width) / 2,
 					y + (90 - height) / 2
 				)
 			} catch (e) {
-				this.ipcWrapper.log('debug', `fillImage failed after ${attempts} attempts: ${e}`)
+				this.ipcWrapper.log('debug', `fillImage failed: ${e}`)
 				this.ipcWrapper.remove()
 			}
 		})
@@ -189,10 +223,10 @@ class SurfaceUSBLoupedeckLive {
 		this.ipcWrapper.log('debug', `Elgato ${this.loupedeck.modelName} detected`)
 
 		// Make sure the first clear happens properly
-		await this.loupedeck.blankDevice()
+		await this.loupedeck.blankDevice(true, true)
 	}
 
-	static async create(ipcWrapper, devicepath) {
+	static async create(ipcWrapper: IpcWrapper, devicepath: string) {
 		const loupedeck = await openLoupedeck(devicepath, { waitForAcks: true })
 		try {
 			let info = null
@@ -222,7 +256,7 @@ class SurfaceUSBLoupedeckLive {
 		}
 	}
 
-	setConfig(config, force) {
+	setConfig(config: SurfaceConfig, force?: boolean): void {
 		if ((force || this.config.brightness != config.brightness) && config.brightness !== undefined) {
 			this.loupedeck.setBrightness(config.brightness / 100).catch((e) => {
 				this.ipcWrapper.log('debug', `Set brightness failed: ${e}`)
@@ -232,7 +266,7 @@ class SurfaceUSBLoupedeckLive {
 		this.config = config
 	}
 
-	quit() {
+	quit(): void {
 		try {
 			this.clearDeck()
 		} catch (e) {}
@@ -240,11 +274,11 @@ class SurfaceUSBLoupedeckLive {
 		this.loupedeck.close()
 	}
 
-	draw(key, buffer, style) {
+	draw(key: number, buffer: Buffer | undefined, style: SurfaceDrawStyle): void {
 		const x = (key % this.modelInfo.totalCols) - this.modelInfo.lcdXOffset
 		const y = Math.floor(key / this.modelInfo.totalCols)
 
-		if (x >= 0 && x < this.modelInfo.lcdCols && y >= 0 && y < this.modelInfo.lcdRows) {
+		if (buffer && x >= 0 && x < this.modelInfo.lcdCols && y >= 0 && y < this.modelInfo.lcdRows) {
 			const button = x + y * this.modelInfo.lcdCols
 
 			this.write_queue.queue(button, buffer)
@@ -252,7 +286,7 @@ class SurfaceUSBLoupedeckLive {
 
 		const buttonIndex = this.modelInfo.buttons.indexOf(key)
 		if (buttonIndex >= 0) {
-			const color = style ? colorToRgb(style.bgcolor) : { r: 0, g: 0, b: 0 }
+			const color = style && typeof style !== 'string' ? colorToRgb(style.bgcolor) : { r: 0, g: 0, b: 0 }
 
 			this.loupedeck
 				.setButtonColor({
@@ -265,14 +299,12 @@ class SurfaceUSBLoupedeckLive {
 					this.ipcWrapper.log('debug', `color failed: ${e}`)
 				})
 		}
-
-		return true
 	}
 
-	clearDeck() {
+	clearDeck(): void {
 		this.ipcWrapper.log('debug', 'loupedeck.clearDeck()')
 
-		this.loupedeck.blankDevice().catch((e) => {
+		this.loupedeck.blankDevice(true, true).catch((e) => {
 			this.ipcWrapper.log('debug', `blank failed: ${e}`)
 		})
 	}

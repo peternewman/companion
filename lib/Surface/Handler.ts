@@ -49,6 +49,8 @@ class SurfaceHandler extends CoreBase {
 		brightness: 100,
 		rotation: 0,
 
+		illuminate_pressed: false,
+
 		emulator_control_enable: true,
 		emulator_prompt_fullscreen: true,
 

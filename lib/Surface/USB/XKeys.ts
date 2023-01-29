@@ -14,7 +14,15 @@
  * disclosing the source code of your own applications.
  */
 
-import { setupXkeysPanel } from 'xkeys'
+import { setupXkeysPanel, XKeys } from 'xkeys'
+import { MAX_BUTTONS, MAX_BUTTONS_PER_ROW } from '../../Resources/Constants.js'
+import type { IpcWrapper, SurfaceChild, SurfaceConfig, SurfaceDrawStyle, SurfaceInfo } from './Common.js'
+
+interface Color {
+	r: number
+	g: number
+	b: number
+}
 
 /**
  * Creates an instance of xkeys.
@@ -22,16 +30,22 @@ import { setupXkeysPanel } from 'xkeys'
  * @param {*} devicepath
  * @memberof xkeys
  */
-class SurfaceUSBXKeys {
-	constructor(ipcWrapper, devicepath, panel, deviceId) {
+class SurfaceUSBXKeys implements SurfaceChild {
+	private readonly ipcWrapper: IpcWrapper
+	private readonly myXkeysPanel: XKeys
+
+	config: SurfaceConfig
+	info: SurfaceInfo
+
+	pressed = new Set<number>()
+	mapDeviceToCompanion: number[] = []
+	mapCompanionToDevice: number[] = []
+
+	lastColors: Color[] = []
+
+	constructor(ipcWrapper: IpcWrapper, devicepath: string, panel: XKeys, deviceId: string) {
 		this.ipcWrapper = ipcWrapper
 		this.myXkeysPanel = panel
-
-		this.mapDeviceToCompanion = []
-		this.mapCompanionToDevice = []
-
-		this.lastColors = []
-		this.pressed = new Set()
 
 		this.info = {
 			type: `XKeys ${this.myXkeysPanel.info.name}`,
@@ -39,8 +53,10 @@ class SurfaceUSBXKeys {
 			configFields: ['brightness', 'illuminate_pressed'],
 			deviceId: deviceId,
 
-			keysPerRow: global.MAX_BUTTONS_PER_ROW,
-			keysTotal: global.MAX_BUTTONS,
+			keysPerRow: MAX_BUTTONS_PER_ROW,
+			keysTotal: MAX_BUTTONS,
+
+			location: '',
 		}
 
 		this.config = {
@@ -81,7 +97,7 @@ class SurfaceUSBXKeys {
 		})
 
 		// Listen to pressed buttons:
-		this.myXkeysPanel.on('down', (keyIndex, metadata) => {
+		this.myXkeysPanel.on('down', (keyIndex, _metadata) => {
 			const key = this.mapDeviceToCompanion[keyIndex - 1]
 			if (key === undefined) {
 				return
@@ -90,8 +106,8 @@ class SurfaceUSBXKeys {
 			this.ipcWrapper.log('debug', `keyIndex: ${keyIndex}, companion button: ${key}`)
 			this.pressed.add(keyIndex)
 
-			const pageOffset = Math.floor(key / global.MAX_BUTTONS)
-			const localKey = key % global.MAX_BUTTONS
+			const pageOffset = Math.floor(key / MAX_BUTTONS)
+			const localKey = key % MAX_BUTTONS
 
 			this.ipcWrapper.click(localKey, true, pageOffset)
 
@@ -103,7 +119,7 @@ class SurfaceUSBXKeys {
 		})
 
 		// Listen to released buttons:
-		this.myXkeysPanel.on('up', (keyIndex, metadata) => {
+		this.myXkeysPanel.on('up', (keyIndex, _metadata) => {
 			const key = this.mapDeviceToCompanion[keyIndex - 1]
 			if (key === undefined) {
 				return
@@ -112,8 +128,8 @@ class SurfaceUSBXKeys {
 			this.ipcWrapper.log('debug', `keyIndex: ${keyIndex}, companion button: ${key}`)
 			this.pressed.delete(keyIndex)
 
-			const pageOffset = Math.floor(key / global.MAX_BUTTONS)
-			const localKey = key % global.MAX_BUTTONS
+			const pageOffset = Math.floor(key / MAX_BUTTONS)
+			const localKey = key % MAX_BUTTONS
 
 			this.ipcWrapper.click(localKey, false, pageOffset)
 
@@ -156,11 +172,11 @@ class SurfaceUSBXKeys {
 		setTimeout(() => {
 			const { colCount, rowCount } = this.myXkeysPanel.info
 			// Ask companion to provide colours for enough pages of buttons
-			this.ipcWrapper.xkeysSubscribePages(Math.ceil((colCount * rowCount) / global.MAX_BUTTONS))
+			this.ipcWrapper.xkeysSubscribePages(Math.ceil((colCount * rowCount) / MAX_BUTTONS))
 		}, 1000)
 	}
 
-	static async create(ipcWrapper, devicepath) {
+	static async create(ipcWrapper: IpcWrapper, devicepath: string) {
 		const panel = await setupXkeysPanel(devicepath)
 
 		const deviceId = `xkeys:${panel.info.productId}-${panel.info.unitId}` // TODO - this needs some additional uniqueness to the sufix
@@ -178,12 +194,12 @@ class SurfaceUSBXKeys {
 	 * @param {companion config} config
 	 * @returns false when nothing happens
 	 */
-	setConfig(config) {
+	setConfig(config: SurfaceConfig, _force?: boolean): void {
 		if (
 			(this.config.brightness != config.brightness && config.brightness !== undefined) ||
 			this.config.illuminate_pressed !== config.illuminate_pressed
 		) {
-			const intensity = config.brightness * 2.55
+			const intensity = (config.brightness || 100) * 2.55
 			this.myXkeysPanel.setBacklightIntensity(intensity, config.illuminate_pressed ? 255 : intensity)
 		} else if (config.brightness === undefined) {
 			this.myXkeysPanel.setBacklightIntensity(60, config.illuminate_pressed ? 255 : 60)
@@ -195,7 +211,7 @@ class SurfaceUSBXKeys {
 	/**
 	 * When quit is called, close the deck
 	 */
-	quit() {
+	quit(): void {
 		const xkeys = this.myXkeysPanel
 
 		if (xkeys) {
@@ -205,11 +221,15 @@ class SurfaceUSBXKeys {
 		}
 	}
 
-	draw() {
+	draw(_key: number, _buffer: Buffer | undefined, _style: SurfaceDrawStyle): void {
 		// Should never be fired
 	}
 
-	drawColor(page, key, color) {
+	clearDeck(): void {
+		// Nothing to do
+	}
+
+	drawColor(page: number, key: number, color: number): void {
 		// Feedback
 		const color2 = {
 			r: (color >> 16) & 0xff,
@@ -217,7 +237,7 @@ class SurfaceUSBXKeys {
 			b: color & 0xff,
 		}
 
-		const buttonNumber = page * global.MAX_BUTTONS + key
+		const buttonNumber = page * MAX_BUTTONS + key
 		if (buttonNumber <= this.mapCompanionToDevice.length) {
 			const buttonIndex = this.mapCompanionToDevice[buttonNumber - 1]
 			if (buttonIndex !== undefined) {

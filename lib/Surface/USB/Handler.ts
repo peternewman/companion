@@ -20,6 +20,7 @@ import HID from 'node-hid'
 // import InfinittonDriver from './Infinitton.js'
 import XKeysDriver from './XKeys.js'
 import LoupedeckLiveDriver from './LoupedeckLive.js'
+import { IpcWrapper, SurfaceChild } from './Common.js'
 
 if (process.platform === 'linux') {
 	HID.setDriverType('hidraw')
@@ -27,51 +28,20 @@ if (process.platform === 'linux') {
 	HID.devices()
 }
 
-global.MAX_BUTTONS = parseInt(process.env.MAX_BUTTONS)
-global.MAX_BUTTONS_PER_ROW = parseInt(process.env.MAX_BUTTONS_PER_ROW)
-
 /*
 	This is written with the idea that it might only handle one device, or more than one device
 	for future compatibility. Currently each handler instance only handles one device though.
 */
-const driver_instances = {}
+const driver_instances: Record<string, SurfaceChild> = {}
 
 process.on('uncaughtException', (err) => {
-	process.send({ cmd: 'log', level: 'debug', message: `uncaughtException: ${err}` })
+	process.send!({ cmd: 'log', level: 'debug', message: `uncaughtException: ${err}` })
 })
 process.on('unhandledRejection', (err) => {
-	process.send({ cmd: 'log', level: 'debug', message: `unhandledRejection: ${err}` })
+	process.send!({ cmd: 'log', level: 'debug', message: `unhandledRejection: ${err}` })
 })
 
-class IpcWrapper {
-	#id
-	#devicePath
-
-	constructor(id, devicePath) {
-		this.#id = id
-		this.#devicePath = devicePath
-	}
-	log(level, message) {
-		process.send({ cmd: 'log', id: this.#id, device: this.#devicePath, level, message })
-	}
-	remove() {
-		process.send({ cmd: 'remove', id: this.#id, device: this.#devicePath })
-	}
-	click(key, pressed, pageOffset) {
-		process.send({ cmd: 'click', id: this.#id, device: this.#devicePath, key, pressed, pageOffset })
-	}
-	rotate(key, direction, pageOffset) {
-		process.send({ cmd: 'rotate', id: this.#id, device: this.#devicePath, key, direction, pageOffset })
-	}
-	xkeysSetVariable(name, value) {
-		process.send({ cmd: 'xkeys-setVariable', id: this.#id, device: this.#devicePath, name, value })
-	}
-	xkeysSubscribePages(pageCount) {
-		process.send({ cmd: 'xkeys-subscribePage', id: this.#id, device: this.#devicePath, pageCount })
-	}
-}
-
-process.on('message', (data) => {
+process.on('message', (data: any) => {
 	if (data.cmd == 'add') {
 		Promise.resolve()
 			.then(async () => {
@@ -93,23 +63,23 @@ process.on('message', (data) => {
 
 				// Setup the instance
 				driver_instances[data.id] = driver_instance
-				process.send({ cmd: 'add', id: data.id, info: driver_instance.info })
+				process.send!({ cmd: 'add', id: data.id, info: driver_instance.info })
 			})
-			.catch((e) => {
-				process.send({ cmd: 'error', id: data.id, error: e.message + ' AND GOT: ' + JSON.stringify(data) })
+			.catch((e: any) => {
+				process.send!({ cmd: 'error', id: data.id, error: e.message + ' AND GOT: ' + JSON.stringify(data) })
 			})
 	} else if (data.cmd == 'remove') {
 		try {
 			driver_instances[data.id].quit()
-			process.send({ cmd: 'remove', id: data.id })
-		} catch (e) {
-			process.send({ cmd: 'error', id: data.id, error: e.message })
+			process.send!({ cmd: 'remove', id: data.id })
+		} catch (e: any) {
+			process.send!({ cmd: 'error', id: data.id, error: e.message })
 		}
 	} else if (data.cmd == 'quit') {
 		try {
 			driver_instances[data.id].quit()
-		} catch (e) {
-			process.send({ cmd: 'error', id: data.id, error: e.message })
+		} catch (e: any) {
+			process.send!({ cmd: 'error', id: data.id, error: e.message })
 		}
 	} else if (data.cmd == 'draw') {
 		try {
@@ -123,29 +93,32 @@ process.on('message', (data) => {
 			}
 
 			driver_instances[data.id].draw(data.key, buffer, data.style)
-		} catch (e) {
-			process.send({ cmd: 'error', id: data.id, error: e.message })
+		} catch (e: any) {
+			process.send!({ cmd: 'error', id: data.id, error: e.message })
 		}
 	} else if (data.cmd == 'clearDeck') {
 		try {
 			driver_instances[data.id].clearDeck()
-		} catch (e) {
-			process.send({ cmd: 'error', id: data.id, error: e.message })
+		} catch (e: any) {
+			process.send!({ cmd: 'error', id: data.id, error: e.message })
 		}
 	} else if (data.cmd == 'setConfig') {
 		try {
 			driver_instances[data.id].setConfig(data.config, data.force)
-		} catch (e) {
-			process.send({ cmd: 'error', id: data.id, error: e.message })
+		} catch (e: any) {
+			process.send!({ cmd: 'error', id: data.id, error: e.message })
 		}
-	} else if (data.cmd == 'xkeys-color' && typeof driver_instances[data.id].drawColor === 'function') {
-		try {
-			driver_instances[data.id].drawColor(data.page, data.key, data.color)
-		} catch (e) {
-			process.send({ cmd: 'error', id: data.id, error: e.message })
+	} else if (data.cmd == 'xkeys-color') {
+		const instance = driver_instances[data.id]
+		if (instance && typeof instance.drawColor === 'function') {
+			try {
+				instance.drawColor(data.page, data.key, data.color)
+			} catch (e: any) {
+				process.send!({ cmd: 'error', id: data.id, error: e.message })
+			}
 		}
 	}
 })
 
 // Inform parent we are ready for devices to be added
-process.send({ cmd: 'ready' })
+process.send!({ cmd: 'ready' })

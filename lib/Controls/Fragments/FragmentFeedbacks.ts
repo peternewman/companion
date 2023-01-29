@@ -211,7 +211,7 @@ export default class FragmentFeedbacks<TStyle> extends CoreBase {
 		if (feedback) {
 			const instance = this.instance.moduleHost.getChild(feedback.instance_id)
 			if (instance) {
-				const newOptions = await instance.feedbackLearnValues(feedback)
+				const newOptions = await instance.feedbackLearnValues(feedback, this.controlId)
 				if (newOptions) {
 					const newFeedback = {
 						...feedback,

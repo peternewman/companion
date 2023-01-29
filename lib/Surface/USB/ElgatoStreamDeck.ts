@@ -15,33 +15,36 @@
  *
  */
 
-import { DeviceModelId, openStreamDeck } from '@elgato-stream-deck/node'
+import { DeviceModelId, openStreamDeck, StreamDeck } from '@elgato-stream-deck/node'
 import util from 'util'
 import sharp from 'sharp'
 import ImageWriteQueue from '../../Resources/ImageWriteQueue.js'
 import { rotateBuffer } from '../../Resources/Util.js'
-import { throwStatement } from '@babel/types'
+import type { IpcWrapper, SurfaceChild, SurfaceConfig, SurfaceDrawStyle, SurfaceInfo } from './Common.js'
 const setTimeoutPromise = util.promisify(setTimeout)
 
-class SurfaceUSBElgatoStreamDeck {
-	constructor(ipcWrapper, devicepath) {
+class SurfaceUSBElgatoStreamDeck implements SurfaceChild {
+	ipcWrapper: IpcWrapper
+
+	streamDeck: StreamDeck
+	write_queue: ImageWriteQueue
+	lcdWriteQueue: ImageWriteQueue | undefined
+
+	info: SurfaceInfo
+
+	config: SurfaceConfig
+
+	constructor(ipcWrapper: IpcWrapper, streamDeck: StreamDeck, devicepath: string) {
+		this.ipcWrapper = ipcWrapper
+		this.streamDeck = streamDeck
+
+		this.config = {
+			brightness: 100,
+			rotation: 0,
+		}
+
 		try {
-			this.ipcWrapper = ipcWrapper
-
-			this.config = {
-				brightness: 100,
-				rotation: 0,
-			}
-
 			this.ipcWrapper.log('debug', `Adding elgato_streamdeck USB device: ${devicepath}`)
-
-			this.streamDeck = openStreamDeck(devicepath, {
-				// useOriginalKeyOrder: true,
-				jpegOptions: {
-					quality: 95,
-					subsampling: 1, // 422
-				},
-			})
 
 			this.info = {
 				type: `Elgato ${this.streamDeck.PRODUCT_NAME}`,
@@ -49,7 +52,8 @@ class SurfaceUSBElgatoStreamDeck {
 				configFields: ['brightness', 'rotation'],
 				keysPerRow: this.streamDeck.KEY_COLUMNS,
 				keysTotal: this.streamDeck.NUM_KEYS,
-				deviceId: undefined, // set in #init()
+				deviceId: '', // set in #init()
+				location: '',
 			}
 
 			this.write_queue = new ImageWriteQueue(this.ipcWrapper, async (key, buffer) => {
@@ -117,7 +121,7 @@ class SurfaceUSBElgatoStreamDeck {
 				})
 
 				const lcdOffset = 8
-				const lcdPress = (segmentIndex) => {
+				const lcdPress = (segmentIndex: number) => {
 					this.ipcWrapper.click(lcdOffset + segmentIndex, true)
 
 					setTimeout(() => {
@@ -180,15 +184,23 @@ class SurfaceUSBElgatoStreamDeck {
 		await this.streamDeck.clearPanel()
 	}
 
-	static async create(ipcWrapper, devicepath) {
-		const self = new SurfaceUSBElgatoStreamDeck(ipcWrapper, devicepath)
+	static async create(ipcWrapper: IpcWrapper, devicepath: string) {
+		const streamDeck = openStreamDeck(devicepath, {
+			// useOriginalKeyOrder: true,
+			jpegOptions: {
+				quality: 95,
+				subsampling: 1, // 422
+			},
+		})
+
+		const self = new SurfaceUSBElgatoStreamDeck(ipcWrapper, streamDeck, devicepath)
 
 		await self.#init()
 
 		return self
 	}
 
-	setConfig(config, force) {
+	setConfig(config: SurfaceConfig, force?: boolean): void {
 		if ((force || this.config.brightness != config.brightness) && config.brightness !== undefined) {
 			this.streamDeck.setBrightness(config.brightness).catch((e) => {
 				this.ipcWrapper.log('debug', `Set brightness failed: ${e}`)
@@ -198,7 +210,7 @@ class SurfaceUSBElgatoStreamDeck {
 		this.config = config
 	}
 
-	quit() {
+	quit(): void {
 		this.streamDeck
 			.resetToLogo()
 			.catch((e) => {
@@ -210,7 +222,7 @@ class SurfaceUSBElgatoStreamDeck {
 			})
 	}
 
-	clearDeck() {
+	clearDeck(): void {
 		this.ipcWrapper.log('silly', 'elgato_base.prototype.clearDeck()')
 
 		this.streamDeck.clearPanel().catch((e) => {
@@ -218,19 +230,19 @@ class SurfaceUSBElgatoStreamDeck {
 		})
 	}
 
-	draw(key, buffer, style) {
-		buffer = rotateBuffer(buffer, this.config.rotation)
+	draw(key: number, buffer: Buffer | undefined, _style: SurfaceDrawStyle): void {
+		if (!buffer) return
+
+		buffer = rotateBuffer(buffer, this.config.rotation ?? 0)
 
 		if (key >= 0 && key < this.streamDeck.NUM_KEYS) {
 			this.write_queue.queue(key, buffer)
 		}
 
 		const segmentIndex = key - this.streamDeck.NUM_KEYS
-		if (segmentIndex >= 0 && segmentIndex < this.streamDeck.KEY_COLUMNS) {
+		if (this.lcdWriteQueue && segmentIndex >= 0 && segmentIndex < this.streamDeck.KEY_COLUMNS) {
 			this.lcdWriteQueue.queue(segmentIndex, buffer)
 		}
-
-		return true
 	}
 }
 

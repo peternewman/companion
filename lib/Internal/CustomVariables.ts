@@ -249,7 +249,7 @@ export default class CustomVariables extends InternalFragment {
 			return true
 		} else if (action.action === 'custom_variable_store_variable') {
 			const [instanceLabel, variableName] = SplitVariableId(action.options.variable)
-			const value = this.instance.variable.getVariableValue(instanceLabel, variableName)
+			const value = String(this.instance.variable.getVariableValue(instanceLabel, variableName))
 			this.instance.variable.custom.setValue(action.options.name, value)
 			return true
 		} else if (action.action === 'custom_variable_set_via_jsonpath') {
@@ -319,22 +319,22 @@ export default class CustomVariables extends InternalFragment {
 					break
 			}
 
-			this.instance.variable.custom.setValue(action.options.result, value)
+			this.instance.variable.custom.setValue(action.options.result, value + '')
 		} else if (action.action == 'custom_variable_math_int_operation') {
 			const [instanceLabel, variableName] = SplitVariableId(action.options.variable)
-			const variable_value = this.instance.variable.getVariableValue(instanceLabel, variableName)
+			const variable_value = String(this.instance.variable.getVariableValue(instanceLabel, variableName))
 			const value = parseInt(variable_value, action.options.radix)
 
-			this.instance.variable.custom.setValue(action.options.result, value)
+			this.instance.variable.custom.setValue(action.options.result, value + '')
 		} else if (action.action == 'custom_variable_string_trim_operation') {
 			const [instanceLabel, variableName] = SplitVariableId(action.options.variable)
-			const variable_value = this.instance.variable.getVariableValue(instanceLabel, variableName)
+			const variable_value = String(this.instance.variable.getVariableValue(instanceLabel, variableName))
 			const value = variable_value.trim()
 
 			this.instance.variable.custom.setValue(action.options.result, value)
 		} else if (action.action == 'custom_variable_string_concat_operation') {
 			const [instanceLabel, variableName] = SplitVariableId(action.options.variable)
-			const variable_value = this.instance.variable.getVariableValue(instanceLabel, variableName)
+			const variable_value = String(this.instance.variable.getVariableValue(instanceLabel, variableName))
 
 			const operation_value = this.instance.variable.parseVariables(action.options.value).text
 

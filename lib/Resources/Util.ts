@@ -1,4 +1,4 @@
-import { CompanionAlignment } from '@companion-module/base'
+import type { CompanionAlignment } from '@companion-module/base'
 import { HAlignment, VAlignment } from '../Graphics/Image.js'
 import type { Registry, ButtonStyle } from '../tmp.js'
 import { MAX_BUTTONS, MAX_BUTTONS_PER_ROW } from './Constants.js'
