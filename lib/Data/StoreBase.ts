@@ -407,15 +407,15 @@ class DataStoreBase<TStore> extends CoreBase {
 	 * @param {Object} value - the object to save
 	 * @access public
 	 */
-	setKey(key: keyof TStore, value: any): void {
+	setKey(key: keyof TStore | string[], value: any): void {
 		this.logger.silly(`${this.name}_set(${String(key)}, ${value})`)
 
 		if (key !== undefined) {
 			if (Array.isArray(key)) {
-				if (key.length > 0) {
-					const keyStr = key.join(':')
-					const lastK = key.pop()
+				const keyStr = key.join(':')
+				const lastK = key.pop()
 
+				if (lastK !== undefined) {
 					// Find or create the parent object
 					let dbObj: any = this.store
 					for (const k of key) {

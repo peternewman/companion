@@ -800,7 +800,7 @@ class SocketEventsHandler {
 	 */
 	async #handleSetCustomVariable(msg: SetCustomVariableMessage): Promise<void> {
 		try {
-			this.registry.instance.variable.custom.setValue(msg.customVariableId, msg.value)
+			this.registry.instance.variable.custom.setValue(msg.customVariableId, msg.value + '')
 		} catch (e) {
 			this.logger.error(`Set custom variable failed: ${e}`)
 		}

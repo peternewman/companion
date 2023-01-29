@@ -353,8 +353,9 @@ export default class ControlTrigger
 		return false
 	}
 
-	checkButtonStatus(): void {
+	checkButtonStatus(): boolean {
 		// Ignore
+		return false
 	}
 
 	executeActions(nowTime: number, isTest?: boolean): void {

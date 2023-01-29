@@ -242,7 +242,12 @@ class Instance extends CoreBase {
 		}
 	}
 
-	setInstanceLabelAndConfig(id: string, newLabel: string, config: unknown, skip_notify_instance?: boolean): void {
+	setInstanceLabelAndConfig(
+		id: string,
+		newLabel: string | null,
+		config: unknown,
+		skip_notify_instance?: boolean
+	): void {
 		const entry = this.store.db[id]
 		if (!entry) {
 			this.logger.warn(`setInstanceLabelAndConfig id "${id}" does not exist!`)
@@ -306,7 +311,7 @@ class Instance extends CoreBase {
 		return label
 	}
 
-	addInstance(data, disabled: boolean): string | undefined {
+	addInstance(data: { type: string; product: string | undefined }, disabled: boolean): string | undefined {
 		let module = data.type
 		let product = data.product
 
@@ -315,6 +320,7 @@ class Instance extends CoreBase {
 			Math.max(
 				0,
 				...Object.values(this.store.db)
+					.filter((c): c is InstanceStoreConfig => !!c)
 					.map((c) => c.sortOrder)
 					.filter((n) => typeof n === 'number')
 			) || 0
@@ -347,6 +353,8 @@ class Instance extends CoreBase {
 
 			return id
 		}
+
+		return undefined
 	}
 
 	getLabelForInstance(id: string): string | undefined {
@@ -446,12 +454,14 @@ class Instance extends CoreBase {
 	getInstancesMetrics() {
 		const instancesCounts: Record<string, number> = {}
 
-		for (const instance_config of Object.values(this.store.db)) {
-			if (instance_config.instance_type !== 'bitfocus-companion' && instance_config.enabled !== false) {
-				if (instancesCounts[instance_config.instance_type]) {
-					instancesCounts[instance_config.instance_type]++
+		const instanceIds = this.instance.getAllInstanceIds()
+		for (const instanceId of instanceIds) {
+			const instanceConfig = this.instance.getInstanceConfig(instanceId)
+			if (instanceConfig && instanceConfig.enabled) {
+				if (instancesCounts[instanceConfig.instance_type]) {
+					instancesCounts[instanceConfig.instance_type]++
 				} else {
-					instancesCounts[instance_config.instance_type] = 1
+					instancesCounts[instanceConfig.instance_type] = 1
 				}
 			}
 		}
@@ -617,7 +627,7 @@ class Instance extends CoreBase {
 			await this.deleteInstance(id)
 		})
 
-		client.onPromise('instances:add', (module) => {
+		client.onPromise('instances:add', (module: { type: string; product: string | undefined }) => {
 			const id = this.addInstance(module, false)
 			return id
 		})

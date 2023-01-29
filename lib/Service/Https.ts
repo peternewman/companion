@@ -138,7 +138,7 @@ class ServiceHttps extends ServiceBase<_https.Server> {
 	 */
 	startServer(credentials: Credentials) {
 		try {
-			this.server = _https.createServer(credentials, this.express)
+			this.server = _https.createServer(credentials, this.express.app)
 			this.server.on('error', this.handleSocketError.bind(this))
 			this.server.listen(this.port, this.bindIP)
 			this.io.enableHttps(this.server)

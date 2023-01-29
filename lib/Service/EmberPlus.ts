@@ -2,7 +2,7 @@ import { EmberServer, Model as EmberModel } from 'emberplus-connection'
 import { getPath } from 'emberplus-connection/dist/Ember/Lib/util.js'
 import { Collection, EmberValue } from 'emberplus-connection/dist/types/types.js'
 import { CreateBankControlId } from '../Shared/ControlId.js'
-import { ButtonDrawStyle, ButtonRender, Registry } from '../tmp.js'
+import { ButtonRender, Registry } from '../tmp.js'
 import ServiceBase from './Base.js'
 
 class EmberServerExt extends EmberServer {

@@ -81,7 +81,7 @@ class SurfaceIPSatellite extends EventEmitter<ISurfaceEvents> implements ISurfac
 
 	quit(): void {}
 
-	draw(key: number, buffer: Buffer | undefined, style: SurfaceDrawStyle | undefined): boolean {
+	draw(key: number, buffer: Buffer | undefined, style: SurfaceDrawStyle | undefined): void {
 		if (this.socket !== undefined) {
 			let params = ``
 			if (this.#streamColors) {
@@ -116,8 +116,6 @@ class SurfaceIPSatellite extends EventEmitter<ISurfaceEvents> implements ISurfac
 
 			this.socket.write(`KEY-STATE DEVICEID=${this.deviceId} KEY=${key} TYPE=${type} ${params}\n`)
 		}
-
-		return true
 	}
 
 	doButton(key: number, state: boolean): void {

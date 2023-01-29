@@ -21,7 +21,7 @@ import { MAX_BUTTONS, MAX_BUTTONS_PER_ROW } from '../Resources/Constants.js'
 import { toDeviceKey, toGlobalKey } from '../Resources/Util.js'
 import { CreateBankControlId } from '../Shared/ControlId.js'
 import { ButtonRender, Complete, Registry } from '../tmp.js'
-import { ISurface, SurfaceConfig, SurfaceDrawStyle } from './info.js'
+import { ISurface, SurfaceConfig } from './info.js'
 
 export interface SurfaceConfigExt extends SurfaceConfig {
 	use_last_page: boolean
@@ -254,8 +254,8 @@ class SurfaceHandler extends CoreBase {
 				this.#drawButton(PINCODE_CODE_POSITION, buffers.code.buffer, undefined)
 
 				PINCODE_NUMBER_POSITIONS.forEach((key, i) => {
-					if (buffers[i]) {
-						this.#drawButton(key, buffers[i].buffer, undefined)
+					if (buffers.numbers[i]) {
+						this.#drawButton(key, buffers.numbers[i].buffer, undefined)
 					}
 				})
 			} else if (this.#xkeysPageCount > 0) {
@@ -275,7 +275,7 @@ class SurfaceHandler extends CoreBase {
 		}
 	}
 
-	#drawButton(key: number, buffer: Buffer | undefined, style: SurfaceDrawStyle | undefined): void {
+	#drawButton(key: number, buffer: Buffer | undefined, style: ButtonRender['style'] | undefined): void {
 		const localKey = toDeviceKey(this.panel.info.keysTotal, this.panel.info.keysPerRow, key)
 		if (localKey >= 0 && localKey < this.panel.info.keysTotal) {
 			this.panel.draw(localKey, buffer, style)
@@ -313,7 +313,7 @@ class SurfaceHandler extends CoreBase {
 			// xkeys mode
 			const pageOffset = page - this.currentPage
 			if (this.panel.xkeysDraw && pageOffset >= 0 && pageOffset < this.#xkeysPageCount) {
-				this.panel.xkeysDraw(pageOffset, bank, render.style?.bgcolor || 0)
+				this.panel.xkeysDraw(pageOffset, bank, typeof render.style === 'string' ? 0 : render.style?.bgcolor || 0)
 			}
 		} else if (page == this.currentPage) {
 			// normal mode
@@ -473,7 +473,7 @@ class SurfaceHandler extends CoreBase {
 			for (let bank = 0; bank < MAX_BUTTONS; bank++) {
 				const render = this.graphics.getBank(this.currentPage + page, bank)
 
-				this.panel.xkeysDraw(page, bank, render.style?.bgcolor || 0)
+				this.panel.xkeysDraw(page, bank, typeof render.style === 'string' ? 0 : render.style?.bgcolor || 0)
 			}
 		}
 	}

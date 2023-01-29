@@ -8,6 +8,7 @@ export interface SurfaceInfo {
 	keysPerRow: number
 	keysTotal: number
 	deviceId: string
+	// serialnumber: string
 	location: string
 }
 
@@ -35,7 +36,7 @@ export interface ISurface extends EventEmitter<ISurfaceEvents> {
 
 	quit(): void
 
-	draw(key: number, buffer: Buffer | undefined, style: SurfaceDrawStyle): boolean
+	draw(key: number, buffer: Buffer | undefined, style: SurfaceDrawStyle): void
 
 	clearDeck(): void
 

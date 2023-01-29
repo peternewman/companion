@@ -111,10 +111,10 @@ class SurfaceIPElgatoPlugin extends EventEmitter<ISurfaceEvents> implements ISur
 		this.socket.removeAllListeners('rotate')
 	}
 
-	draw(key: number, buffer: Buffer | undefined, _style: SurfaceDrawStyle | undefined): boolean {
+	draw(key: number, buffer: Buffer | undefined, _style: SurfaceDrawStyle | undefined): void {
 		if (buffer === undefined || buffer.length != 15552) {
 			this.logger.silly('buffer was not 15552, but ', buffer?.length)
-			return false
+			return
 		}
 
 		buffer = rotateBuffer(buffer, this._config.rotation ?? 0)
@@ -127,8 +127,6 @@ class SurfaceIPElgatoPlugin extends EventEmitter<ISurfaceEvents> implements ISur
 				},
 			})
 		)
-
-		return true
 	}
 
 	clearDeck(): void {

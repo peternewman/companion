@@ -1,3 +1,4 @@
+import { CompanionAlignment } from '@companion-module/base'
 import { HAlignment, VAlignment } from '../Graphics/Image.js'
 import type { Registry, ButtonStyle } from '../tmp.js'
 import { MAX_BUTTONS, MAX_BUTTONS_PER_ROW } from './Constants.js'
@@ -292,7 +293,7 @@ export function SplitVariableId(variableId: string) {
 	return [label, variable]
 }
 
-export function ParseAlignment(alignment: string, validate = false): [HAlignment, VAlignment, string] {
+export function ParseAlignment(alignment: string, validate = false): [HAlignment, VAlignment, CompanionAlignment] {
 	let [halign0, valign0] = alignment.toLowerCase().split(':', 2)
 
 	let halign: HAlignment

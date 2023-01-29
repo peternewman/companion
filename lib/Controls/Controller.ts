@@ -998,7 +998,7 @@ class ControlsController extends CoreBase {
 	 * @returns {boolean} success
 	 * @access public
 	 */
-	resetControl(controlId: string, newType?: string) {
+	resetControl(controlId: string, newType?: string): boolean {
 		const control = this.getControl(controlId)
 		if (control) {
 			control.destroy()
@@ -1025,6 +1025,8 @@ class ControlsController extends CoreBase {
 			// Force a redraw
 			this.graphics.invalidateControl(controlId)
 		}
+
+		return true
 	}
 
 	/**

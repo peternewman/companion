@@ -424,7 +424,7 @@ export default abstract class ControlBase<TConfigJson, TRuntimeJson = Record<str
 	 * @access public
 	 * @abstract
 	 */
-	toJSON(clone = true): TConfigJson {
+	toJSON(_clone = true): TConfigJson {
 		throw new Error('must be implemented by subclass!')
 	}
 

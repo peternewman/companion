@@ -17,14 +17,16 @@
 
 // We have a lot of problems with USB in electron, so this is a workaround of that.
 // TODO: I (Julian) suspect that this is due to node-hid using the uv-pool for reads, so might not be necessary soon
-import cp from 'child_process'
-import LogController from '../../Log/Controller.js'
-import { EventEmitter } from 'events'
+import cp, { ChildProcess } from 'child_process'
+import LogController, { ChildLogger } from '../../Log/Controller.js'
+import { EventEmitter } from 'eventemitter3'
 import { fileURLToPath } from 'url'
 import { isPackaged } from '../../Resources/Util.js'
+import { ISurface, ISurfaceEvents, SurfaceConfig, SurfaceDrawStyle, SurfaceInfo } from '../info.js'
+import { MAX_BUTTONS, MAX_BUTTONS_PER_ROW } from '../../Resources/Constants.js'
 
-class SurfaceUSBController extends EventEmitter {
-	static async openDevice(type, devicepath) {
+class SurfaceUSBController extends EventEmitter<ISurfaceEvents> implements ISurface {
+	static async openDevice(type: string, devicepath: string): Promise<SurfaceUSBController> {
 		const childId = '0' // The id of the instance inside the fork. We only put one per fork, so can hardcode the id
 
 		const logger = LogController.createLogger(`Surface/USB/${type}/${devicepath}`)
@@ -36,21 +38,21 @@ class SurfaceUSBController extends EventEmitter {
 			{
 				stdio: 'inherit',
 				env: {
-					ELECTRON_RUN_AS_NODE: true,
-					MAX_BUTTONS: global.MAX_BUTTONS,
-					MAX_BUTTONS_PER_ROW: global.MAX_BUTTONS_PER_ROW,
+					ELECTRON_RUN_AS_NODE: '1',
+					MAX_BUTTONS: MAX_BUTTONS + '',
+					MAX_BUTTONS_PER_ROW: MAX_BUTTONS_PER_ROW + '',
 				},
 			}
 		)
 
-		const info = await new Promise((resolve, reject) => {
-			const errorHandler = (e) => {
+		const info = await new Promise<SurfaceInfo>((resolve, reject) => {
+			const errorHandler = (e: any) => {
 				child.removeAllListeners()
 				child.kill('SIGKILL')
 				reject(e)
 			}
 
-			const messageHandler = (data) => {
+			const messageHandler = (data: any) => {
 				if (data.cmd == 'ready') {
 					child.send({ id: childId, cmd: 'add', type: type, devicepath: devicepath })
 				} else if (data.cmd == 'add') {
@@ -77,7 +79,14 @@ class SurfaceUSBController extends EventEmitter {
 		return new SurfaceUSBController(type, info, child)
 	}
 
-	constructor(type, info, child) {
+	private readonly childId: string
+	private readonly logger: ChildLogger
+
+	private readonly child: ChildProcess
+
+	info: SurfaceInfo
+
+	private constructor(type: string, info: SurfaceInfo, child: ChildProcess) {
 		super()
 
 		this.childId = '0' // The id of the instance inside the fork. We only put one per fork, so can hardcode the id
@@ -91,7 +100,7 @@ class SurfaceUSBController extends EventEmitter {
 
 		console.log('sub')
 
-		child.on('message', (data) => {
+		child.on('message', (data: any) => {
 			if (data.cmd == 'error') {
 				this.logger.error('Error from usb module ' + type + ': ' + data.error)
 				// Device threw an error, so remove it
@@ -111,24 +120,24 @@ class SurfaceUSBController extends EventEmitter {
 			}
 		})
 
-		child.on('error', (e) => {
+		child.on('error', (e: any) => {
 			this.logger.warn('Handle USB error: ', e)
 		})
 	}
 
-	setConfig(config, force) {
+	setConfig(config: SurfaceConfig, force?: boolean): void {
 		this.child.send({ cmd: 'setConfig', id: this.childId, config, force })
 	}
 
-	draw(key, buffer, style) {
+	draw(key: number, buffer: Buffer | undefined, style: SurfaceDrawStyle | undefined): void {
 		this.child.send({ cmd: 'draw', id: this.childId, key, buffer, style })
 	}
 
-	clearDeck() {
+	clearDeck(): void {
 		this.child.send({ cmd: 'clearDeck', id: this.childId })
 	}
 
-	quit() {
+	quit(): void {
 		this.child.send({ cmd: 'quit', id: this.childId })
 
 		setTimeout(() => {
@@ -136,7 +145,7 @@ class SurfaceUSBController extends EventEmitter {
 		}, 2000)
 	}
 
-	xkeysDraw(page, key, color) {
+	xkeysDraw(page: number, key: number, color: number): void {
 		this.child.send({ cmd: 'xkeys-color', id: this.childId, page, key, color })
 	}
 }

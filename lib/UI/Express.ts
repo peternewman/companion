@@ -15,18 +15,20 @@
  *
  */
 
-import Express from 'express'
+import express, { Express, static as serverStatic } from 'express'
 import path from 'path'
-import { isPackaged, rgb } from '../Resources/Util.js'
+import { isPackaged, ParseAlignment, rgb } from '../Resources/Util.js'
 import { CreateBankControlId } from '../Shared/ControlId.js'
 import cors from 'cors'
 import fs from 'fs'
+// @ts-expect-error No types for express-serve-zip
 import serveZip from 'express-serve-zip'
 import LogController from '../Log/Controller.js'
 import { fileURLToPath } from 'url'
 import bodyParser from 'body-parser'
+import { ButtonDrawStyle, Registry } from '../tmp.js'
 
-function createServeStatic(zipPath, folderPaths) {
+function createServeStatic(zipPath: string, folderPaths: string[]) {
 	const maxAge = process.env.PRODUCTION ? 3600000 : 0
 
 	if (fs.existsSync(zipPath)) {
@@ -40,7 +42,7 @@ function createServeStatic(zipPath, folderPaths) {
 	} else {
 		for (const folder of folderPaths) {
 			if (fs.existsSync(folder)) {
-				return Express.static(folder, {
+				return serverStatic(folder, {
 					dotfiles: 'ignore',
 					etag: true,
 					extensions: ['html', 'md', 'json'],
@@ -55,36 +57,40 @@ function createServeStatic(zipPath, folderPaths) {
 	}
 }
 
-class UIExpress extends Express {
+class UIExpress {
 	logger = LogController.createLogger('UI/Express')
 
-	constructor(registry) {
-		super()
+	private readonly registry: Registry
+
+	public readonly app: Express
+
+	constructor(registry: Registry) {
+		this.app = express()
 
 		this.registry = registry
 
-		this.use(cors())
+		this.app.use(cors())
 
-		this.use((req, res, next) => {
+		this.app.use((_req, res, next) => {
 			res.set('X-App', 'Bitfocus Companion')
 			next()
 		})
 
 		// parse application/x-www-form-urlencoded
-		this.use(bodyParser.urlencoded({ extended: false }))
+		this.app.use(bodyParser.urlencoded({ extended: false }))
 
 		// parse application/json
-		this.use(bodyParser.json())
+		this.app.use(bodyParser.json())
 
 		// parse text/plain
-		this.use(bodyParser.text())
+		this.app.use(bodyParser.text())
 
-		this.use('/int', this.registry.api_router, (req, res) => {
+		this.app.use('/int', this.registry.api_router, (_req, res) => {
 			res.status(404)
 			res.send('Not found')
 		})
 
-		this.use('/instance/:label', (req, res, next) => {
+		this.app.use('/instance/:label', (req, res, _next) => {
 			const label = req.params.label
 			const connectionId = this.registry.instance.getIdForLabel(label) || label
 			const instance = this.registry.instance.moduleHost.getChild(connectionId)
@@ -95,32 +101,32 @@ class UIExpress extends Express {
 			}
 		})
 
-		this.options('/press/bank/*', (req, res, next) => {
+		this.app.options('/press/bank/*', (_req, res, _next) => {
 			res.header('Access-Control-Allow-Origin', '*')
 			res.header('Access-Control-Allow-Methods', 'GET,OPTIONS')
 			res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With')
 			res.send(200)
 		})
 
-		this.get('^/press/bank/:page([0-9]{1,2})/:bank([0-9]{1,2})', (req, res) => {
+		this.app.get('^/press/bank/:page([0-9]{1,2})/:bank([0-9]{1,2})', (req, res) => {
 			res.header('Access-Control-Allow-Origin', '*')
 			res.header('Access-Control-Allow-Methods', 'GET,OPTIONS')
 			res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With')
 
 			this.logger.info('Got HTTP /press/bank/ (trigger) page ', req.params.page, 'button', req.params.bank)
 
-			const controlId = CreateBankControlId(req.params.page, req.params.bank)
-			this.registry.controls.pressControl(controlId, true)
+			const controlId = CreateBankControlId(Number(req.params.page), Number(req.params.bank))
+			this.registry.controls.pressControl(controlId, true, undefined)
 
 			setTimeout(() => {
 				this.logger.info('Auto releasing HTTP /press/bank/ page ', req.params.page, 'button', req.params.bank)
-				this.registry.controls.pressControl(controlId, false)
+				this.registry.controls.pressControl(controlId, false, undefined)
 			}, 20)
 
 			res.send('ok')
 		})
 
-		this.get('^/press/bank/:page([0-9]{1,2})/:bank([0-9]{1,2})/:direction(down|up)', (req, res) => {
+		this.app.get('^/press/bank/:page([0-9]{1,2})/:bank([0-9]{1,2})/:direction(down|up)', (req, res) => {
 			res.header('Access-Control-Allow-Origin', '*')
 			res.header('Access-Control-Allow-Methods', 'GET,OPTIONS')
 			res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With')
@@ -128,19 +134,19 @@ class UIExpress extends Express {
 			if (req.params.direction == 'down') {
 				this.logger.info('Got HTTP /press/bank/ (DOWN) page ', req.params.page, 'button', req.params.bank)
 
-				const controlId = CreateBankControlId(req.params.page, req.params.bank)
-				this.registry.controls.pressControl(controlId, true)
+				const controlId = CreateBankControlId(Number(req.params.page), Number(req.params.bank))
+				this.registry.controls.pressControl(controlId, true, undefined)
 			} else {
 				this.logger.info('Got HTTP /press/bank/ (UP) page ', req.params.page, 'button', req.params.bank)
 
-				const controlId = CreateBankControlId(req.params.page, req.params.bank)
-				this.registry.controls.pressControl(controlId, false)
+				const controlId = CreateBankControlId(Number(req.params.page), Number(req.params.bank))
+				this.registry.controls.pressControl(controlId, false, undefined)
 			}
 
 			res.send('ok')
 		})
 
-		this.get('^/rescan', (req, res) => {
+		this.app.get('^/rescan', (_req, res) => {
 			res.header('Access-Control-Allow-Origin', '*')
 			res.header('Access-Control-Allow-Methods', 'GET,OPTIONS')
 			res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With')
@@ -156,14 +162,14 @@ class UIExpress extends Express {
 			)
 		})
 
-		this.get('^/style/bank/:page([0-9]{1,2})/:bank([0-9]{1,2})', (req, res) => {
+		this.app.get('^/style/bank/:page([0-9]{1,2})/:bank([0-9]{1,2})', (req, res) => {
 			res.header('Access-Control-Allow-Origin', '*')
 			res.header('Access-Control-Allow-Methods', 'GET,OPTIONS')
 			res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With')
 
 			this.logger.info('Got HTTP /style/bank ', req.params.page, 'button', req.params.bank)
 
-			const controlId = CreateBankControlId(req.params.page, req.params.bank)
+			const controlId = CreateBankControlId(Number(req.params.page), Number(req.params.bank))
 			const control = this.registry.controls.getControl(controlId)
 
 			if (!control || typeof control.styleSetFields !== 'function') {
@@ -172,9 +178,9 @@ class UIExpress extends Express {
 				return
 			}
 
-			const newFields = {}
+			const newFields: Partial<ButtonDrawStyle> = {}
 
-			if (req.query.bgcolor) {
+			if (req.query.bgcolor && typeof req.query.bgcolor === 'string') {
 				const value = req.query.bgcolor.replace(/#/, '')
 				const color = rgb(value.substr(0, 2), value.substr(2, 2), value.substr(4, 2), 16)
 				if (color !== false) {
@@ -182,7 +188,7 @@ class UIExpress extends Express {
 				}
 			}
 
-			if (req.query.color) {
+			if (req.query.color && typeof req.query.color === 'string') {
 				const value = req.query.color.replace(/#/, '')
 				const color = rgb(value.substr(0, 2), value.substr(2, 2), value.substr(4, 2), 16)
 				if (color !== false) {
@@ -190,16 +196,16 @@ class UIExpress extends Express {
 				}
 			}
 
-			if (req.query.size) {
-				const value = req.query.size.replace(/pt/i, '')
-				newFields.size = value
+			if (req.query.size && typeof req.query.size === 'string') {
+				const value = req.query.size.replace(/pt/i, '').trim()
+				newFields.size = value === 'auto' ? 'auto' : Number(value)
 			}
 
-			if (req.query.text || req.query.text === '') {
+			if (typeof req.query.text === 'string') {
 				newFields.text = req.query.text
 			}
 
-			if (req.query.png64 || req.query.png64 === '') {
+			if (typeof req.query.png64 === 'string') {
 				if (req.query.png64 === '') {
 					newFields.png64 = null
 				} else if (!req.query.png64.match(/data:.*?image\/png/)) {
@@ -212,7 +218,7 @@ class UIExpress extends Express {
 				}
 			}
 
-			if (req.query.alignment) {
+			if (req.query.alignment && typeof req.query.alignment === 'string') {
 				try {
 					const [, , alignment] = ParseAlignment(req.query.alignment)
 					newFields.alignment = alignment
@@ -221,7 +227,7 @@ class UIExpress extends Express {
 				}
 			}
 
-			if (req.query.pngalignment) {
+			if (req.query.pngalignment && typeof req.query.pngalignment === 'string') {
 				try {
 					const [, , alignment] = ParseAlignment(req.query.pngalignment)
 					newFields.pngalignment = alignment
@@ -237,7 +243,7 @@ class UIExpress extends Express {
 			res.send('ok')
 		})
 
-		this.get('^/set/custom-variable/:name', (req, res) => {
+		this.app.get('^/set/custom-variable/:name', (req, res) => {
 			res.header('Access-Control-Allow-Origin', '*')
 			res.header('Access-Control-Allow-Methods', 'GET,OPTIONS')
 			res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With')
@@ -263,13 +269,13 @@ class UIExpress extends Express {
 		const docsServer = createServeStatic(path.join(resourcesDir, 'docs.zip'), [path.join(resourcesDir, 'docs')])
 
 		// Serve docs folder as static and public
-		this.use('/docs', docsServer)
+		this.app.use('/docs', docsServer)
 
 		// Serve the webui directory
-		this.use(webuiServer)
+		this.app.use(webuiServer)
 
 		// Handle all unknown urls as accessing index.html
-		this.get('*', (req, res, next) => {
+		this.app.get('*', (req, res, next) => {
 			req.url = '/index.html'
 			return webuiServer(req, res, next)
 		})

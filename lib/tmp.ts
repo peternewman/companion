@@ -18,6 +18,7 @@ import type PageController from './Page/Controller'
 import type GraphicsPreview from './Graphics/Preview'
 import type ServiceController from './Service/Controller'
 import type SurfaceController from './Surface/Controller'
+import type InstanceController from './Instance/Controller'
 import EventEmitter from 'events'
 
 /**
@@ -69,7 +70,7 @@ export interface Registry extends EventEmitter {
 	 * @type {InstanceController}
 	 * @access public
 	 */
-	instance: any // InstanceController // TODO
+	instance: InstanceController
 	/**
 	 * The core interface client
 	 * @type {UIHandler}
@@ -199,7 +200,7 @@ export interface ButtonDrawImageBuffer {
 export interface ButtonRender {
 	updated: number
 	buffer: Buffer
-	style: 'pageup' | 'pagedown' | 'pagenum' | SomeDrawStyle | undefined
+	style: 'pageup' | 'pagedown' | 'pagenum' | ButtonDrawStyle | undefined
 }
 
 export interface ActionInstance {

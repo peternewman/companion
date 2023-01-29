@@ -111,10 +111,10 @@ class SurfaceIPElgatoEmulator extends EventEmitter<ISurfaceEvents> implements IS
 
 	quit(): void {}
 
-	draw(key: number, buffer: Buffer | undefined, _style: SurfaceDrawStyle | undefined): boolean {
+	draw(key: number, buffer: Buffer | undefined, _style: SurfaceDrawStyle | undefined): void {
 		if (buffer === undefined || buffer.length != 15552) {
 			this.logger.verbose('buffer was not 15552, but ', buffer?.length)
-			return false
+			return
 		}
 
 		this.imageCache[key] = buffer || false
@@ -123,8 +123,6 @@ class SurfaceIPElgatoEmulator extends EventEmitter<ISurfaceEvents> implements IS
 		this.#emitChanged()
 
 		// this.io.emitToRoom(EmulatorRoom(this.id), 'emulator:image', key, buffer)
-
-		return true
 	}
 
 	clearDeck(): void {

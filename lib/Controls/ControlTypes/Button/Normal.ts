@@ -10,7 +10,6 @@ import type {
 	Complete,
 	FeedbackInstance,
 	Registry,
-	SomeDrawStyle,
 } from '../../../tmp.js'
 import { ControlBaseWithDynamicActionSets, ControlBaseWithActions, ControlBaseWithSteps } from '../../ControlBase.js'
 

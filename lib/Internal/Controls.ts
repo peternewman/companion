@@ -419,7 +419,7 @@ export default class Controls extends InternalFragment {
 			}
 
 			const render = this.graphics.getBank(thePage, theButton)
-			if (render?.style) {
+			if (render?.style && typeof render.style !== 'string') {
 				// Return cloned resolved style
 				return cloneDeep(render.style)
 			} else {
@@ -474,11 +474,11 @@ export default class Controls extends InternalFragment {
 			let condition_number = Number(condition)
 			let pressIt = false
 			if (action.options.op == 'eq') {
-				if (variable_value.toString() == condition.toString()) {
+				if (variable_value?.toString() == condition.toString()) {
 					pressIt = true
 				}
 			} else if (action.options.op == 'ne') {
-				if (variable_value.toString() !== condition.toString()) {
+				if (variable_value?.toString() !== condition.toString()) {
 					pressIt = true
 				}
 			} else if (action.options.op == 'gt') {
@@ -505,11 +505,11 @@ export default class Controls extends InternalFragment {
 			let condition_number = Number(condition)
 			let pressIt = false
 			if (action.options.op == 'eq') {
-				if (variable_value.toString() == condition.toString()) {
+				if (variable_value?.toString() == condition.toString()) {
 					pressIt = true
 				}
 			} else if (action.options.op == 'ne') {
-				if (variable_value.toString() !== condition.toString()) {
+				if (variable_value?.toString() !== condition.toString()) {
 					pressIt = true
 				}
 			} else if (action.options.op == 'gt') {
@@ -523,8 +523,8 @@ export default class Controls extends InternalFragment {
 			}
 
 			if (pressIt) {
-				const thePage = parseInt(this.instance.variable.getCustomVariableValue(action.options.page))
-				const theButton = parseInt(this.instance.variable.getCustomVariableValue(action.options.bank))
+				const thePage = Number(this.instance.variable.getCustomVariableValue(action.options.page))
+				const theButton = Number(this.instance.variable.getCustomVariableValue(action.options.bank))
 
 				if (!isNaN(thePage) && !isNaN(theButton)) {
 					const controlId = CreateBankControlId(thePage, theButton)

@@ -12,7 +12,7 @@ class UIController {
 
 	constructor(registry: Registry) {
 		this.express = new UIExpress(registry)
-		this.server = new UIServer(registry, this.express)
+		this.server = new UIServer(registry, this.express.app)
 		this.io = new UIHandler(registry, this.server)
 		this.update = new UIUpdate(registry)
 	}
