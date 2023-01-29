@@ -21,7 +21,7 @@ import { EventEmitter } from 'eventemitter3'
 import { CreateBankControlId } from '../../Shared/ControlId.js'
 import type { Registry } from '../../tmp.js'
 import ControlsController from '../../Controls/Controller.js'
-import type { SurfaceInfo, SurfaceConfig, ISurface, ISurfaceEvents } from '../info.js'
+import type { SurfaceInfo, SurfaceConfig, ISurface, ISurfaceEvents, SurfaceDrawStyle } from '../info.js'
 import { MAX_BUTTONS } from '../../Resources/Constants.js'
 import type { WebSocket } from 'ws'
 
@@ -111,7 +111,7 @@ class SurfaceIPElgatoPlugin extends EventEmitter<ISurfaceEvents> implements ISur
 		this.socket.removeAllListeners('rotate')
 	}
 
-	draw(key: number, buffer: Buffer | undefined, style): boolean {
+	draw(key: number, buffer: Buffer | undefined, _style: SurfaceDrawStyle | undefined): boolean {
 		if (buffer === undefined || buffer.length != 15552) {
 			this.logger.silly('buffer was not 15552, but ', buffer?.length)
 			return false

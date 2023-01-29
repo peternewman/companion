@@ -77,7 +77,7 @@ export default class ControlButtonPageUp extends ControlBase<PageUpConfig> {
 	 * @access public
 	 */
 	pressControl(pressed: boolean, deviceId: string | undefined): void {
-		if (pressed) {
+		if (pressed && deviceId) {
 			this.surfaces.devicePageUp(deviceId)
 		}
 	}
@@ -92,5 +92,9 @@ export default class ControlButtonPageUp extends ControlBase<PageUpConfig> {
 		return {
 			type: this.type,
 		}
+	}
+
+	forgetInstance(): void {
+		// Nothing to do
 	}
 }

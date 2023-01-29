@@ -77,7 +77,7 @@ export default class ControlButtonPageDown extends ControlBase<PageDownConfig> {
 	 * @access public
 	 */
 	pressControl(pressed: boolean, deviceId: string | undefined): void {
-		if (pressed) {
+		if (pressed && deviceId) {
 			this.surfaces.devicePageDown(deviceId)
 		}
 	}
@@ -92,5 +92,9 @@ export default class ControlButtonPageDown extends ControlBase<PageDownConfig> {
 		return {
 			type: this.type,
 		}
+	}
+
+	forgetInstance(): void {
+		// Nothing to do
 	}
 }

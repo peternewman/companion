@@ -1,4 +1,4 @@
-import LogController from '../Log/Controller.js'
+import LogController, { ChildLogger } from '../Log/Controller.js'
 import PQueue from 'p-queue'
 import Respawn from 'respawn'
 import { nanoid } from 'nanoid'
@@ -7,6 +7,9 @@ import semver from 'semver'
 import SocketEventsHandler from './Wrapper.js'
 import fs from 'fs-extra'
 import ejson from 'ejson'
+import type { Registry } from '../tmp.js'
+import type InstanceStatus from './Status.js'
+import type { InstanceStoreConfig, ModuleInfo } from './Controller.js'
 
 // This is a messy way to load a package.json, but createRequire, or path.resolve aren't webpack safe
 const moduleBasePkgStr = fs
@@ -15,12 +18,13 @@ const moduleBasePkgStr = fs
 const moduleBasePkg = JSON.parse(moduleBasePkgStr)
 
 const moduleVersion = semver.parse(moduleBasePkg.version)
+if (!moduleVersion) throw new Error('Failed to parse @companion-module/base version')
 const additionalVersions = moduleVersion.major === 1 ? '~0.6 ||' : '' // Allow 0.6, as it is compatible with 1.0, but semver made the jump necessary
 const validApiRange = new semver.Range(
 	`${additionalVersions} ${moduleVersion.major} <= ${moduleVersion.major}.${moduleVersion.minor}` // allow patch versions of the same minor
 )
 
-function sleepStrategy(i) {
+function sleepStrategy(i: number): number {
 	const low = 3
 	const min = 1000
 	const max = 60 * 1000
@@ -31,24 +35,44 @@ function sleepStrategy(i) {
 	}
 }
 
-export function ConnectionDebugLogRoom(id) {
+export function ConnectionDebugLogRoom(id: string): string {
 	return `connection-debug:update:${id}`
 }
 
+interface ModuleChild {
+	readonly connectionId: string
+	readonly lifeCycleQueue: PQueue
+
+	logger: ChildLogger
+
+	isReady: boolean
+	handler?: SocketEventsHandler
+	skipApiVersionCheck?: boolean
+	authToken?: string
+
+	restartCount: number
+	crashed?: NodeJS.Timer
+	monitor?: Respawn
+}
+
 class ModuleHost {
-	constructor(registry, instanceStatus) {
-		this.logger = LogController.createLogger('Instance/ModuleHost')
+	logger = LogController.createLogger('Instance/ModuleHost')
+
+	registry: Registry
+	instanceStatus: InstanceStatus
+
+	children = new Map<string, ModuleChild>()
+
+	constructor(registry: Registry, instanceStatus: InstanceStatus) {
 		this.registry = registry
 		this.instanceStatus = instanceStatus
-
-		this.children = new Map()
 	}
 
 	/**
 	 * Bind events/initialise a connected child process
 	 * @param {?} child
 	 */
-	#listenToModuleSocket(child) {
+	#listenToModuleSocket(child: ModuleChild) {
 		const forceRestart = () => {
 			// Force restart the connetion, as it failed to initialise and will be broken
 			child.restartCount++
@@ -69,7 +93,7 @@ class ModuleHost {
 			delete child.handler
 		}
 
-		const initHandler = (msg) => {
+		const initHandler = (msg: any) => {
 			if (msg.direction === 'call' && msg.name === 'register' && msg.callbackId && msg.payload) {
 				const { apiVersion, connectionId, verificationToken } = ejson.parse(msg.payload)
 				if (!child.skipApiVersionCheck && !validApiRange.test(apiVersion)) {
@@ -154,7 +178,7 @@ class ModuleHost {
 	 * @param {string} connectionId
 	 * @returns {any} ??
 	 */
-	getChild(connectionId, allowInitialising) {
+	getChild(connectionId: string, allowInitialising?: boolean): SocketEventsHandler | undefined {
 		const child = this.children.get(connectionId)
 		if (child && (child.isReady || allowInitialising)) {
 			return child.handler
@@ -167,7 +191,7 @@ class ModuleHost {
 	 * Resend feedbacks to all active instances.
 	 * This will trigger a subscribe call for each feedback
 	 */
-	resubscribeAllFeedbacks() {
+	resubscribeAllFeedbacks(): void {
 		for (const child of this.children.values()) {
 			if (child.handler && child.isReady) {
 				child.handler.sendAllFeedbackInstances().catch((e) => {
@@ -181,8 +205,8 @@ class ModuleHost {
 	 * Send a list of changed variables to all active instances.
 	 * This will trigger feedbacks using variables to be rechecked
 	 */
-	onVariablesChanged(changed_variables, removed_variables) {
-		const changedVariableIds = [...Object.keys(changed_variables), ...removed_variables]
+	onVariablesChanged(changedVariables: Record<string, any>, removedVariables: string[]): void {
+		const changedVariableIds = [...Object.keys(changedVariables), ...removedVariables]
 
 		for (const child of this.children.values()) {
 			if (child.handler && child.isReady) {
@@ -196,7 +220,7 @@ class ModuleHost {
 	/**
 	 * Stop all running instances
 	 */
-	async queueStopAllConnections() {
+	async queueStopAllConnections(): Promise<void> {
 		const ps = []
 
 		for (const connectionId of this.children.keys()) {
@@ -210,7 +234,7 @@ class ModuleHost {
 	 * Stop an instance process/thread
 	 * @param {string} connectionId
 	 */
-	async queueStopConnection(connectionId) {
+	async queueStopConnection(connectionId: string): Promise<void> {
 		const child = this.children.get(connectionId)
 		if (child) {
 			await child.lifeCycleQueue.add(async () => this.#doStopConnectionInner(connectionId, true))
@@ -223,7 +247,7 @@ class ModuleHost {
 	 * @param {string} connectionId
 	 * @param {boolean} allowDeleteIfEmpty delete the work-queue if it has no further jobs
 	 */
-	async #doStopConnectionInner(connectionId, allowDeleteIfEmpty) {
+	async #doStopConnectionInner(connectionId: string, allowDeleteIfEmpty: boolean): Promise<void> {
 		const child = this.children.get(connectionId)
 		if (child) {
 			// Ensure a new child cant register
@@ -263,7 +287,7 @@ class ModuleHost {
 	 * @param {string} connectionId
 	 * @param {string} label
 	 */
-	async updateChildLabel(connectionId, label) {
+	async updateChildLabel(connectionId: string, label: string) {
 		let child = this.children.get(connectionId)
 		if (child) {
 			child.logger = this.registry.log.createLogger(`Instance/${label}`)
@@ -277,7 +301,11 @@ class ModuleHost {
 	 * @param {object} config
 	 * @param {object} moduleInfo
 	 */
-	async queueRestartConnection(connectionId, config, moduleInfo) {
+	async queueRestartConnection(
+		connectionId: string,
+		config: InstanceStoreConfig,
+		moduleInfo: ModuleInfo
+	): Promise<void> {
 		if (!config || !moduleInfo) return
 
 		let child = this.children.get(connectionId)

@@ -18,7 +18,7 @@ import { rotateBuffer } from '../../Resources/Util.js'
 import LogController from '../../Log/Controller.js'
 import { EventEmitter } from 'eventemitter3'
 import { Socket } from 'net'
-import { ISurface, ISurfaceEvents, SurfaceConfig, SurfaceInfo } from '../info.js'
+import { ISurface, ISurfaceEvents, SurfaceConfig, SurfaceDrawStyle, SurfaceInfo } from '../info.js'
 
 export interface SatelliteDeviceInfo {
 	deviceId: string
@@ -81,12 +81,12 @@ class SurfaceIPSatellite extends EventEmitter<ISurfaceEvents> implements ISurfac
 
 	quit(): void {}
 
-	draw(key: number, buffer: Buffer | undefined, style): boolean {
+	draw(key: number, buffer: Buffer | undefined, style: SurfaceDrawStyle | undefined): boolean {
 		if (this.socket !== undefined) {
 			let params = ``
 			if (this.#streamColors) {
 				// convert color to hex
-				const bgcolor = style && typeof style.bgcolor === 'number' ? style.bgcolor : 0
+				const bgcolor = style && typeof style !== 'string' && typeof style.bgcolor === 'number' ? style.bgcolor : 0
 				const color = bgcolor.toString(16).padStart(6, '0')
 
 				params += ` COLOR=#${color}`
@@ -99,7 +99,7 @@ class SurfaceIPSatellite extends EventEmitter<ISurfaceEvents> implements ISurfac
 				}
 			}
 			if (this.#streamText) {
-				const text = style?.text || ''
+				const text = typeof style !== 'string' ? style?.text || '' : ''
 				params += ` TEXT=${Buffer.from(text).toString('base64')}`
 			}
 
@@ -112,7 +112,7 @@ class SurfaceIPSatellite extends EventEmitter<ISurfaceEvents> implements ISurfac
 				type = 'PAGENUM'
 			}
 
-			params += ` PRESSED=${style?.pushed ? 'true' : 'false'}`
+			params += ` PRESSED=${typeof style !== 'string' && style?.pushed ? 'true' : 'false'}`
 
 			this.socket.write(`KEY-STATE DEVICEID=${this.deviceId} KEY=${key} TYPE=${type} ${params}\n`)
 		}

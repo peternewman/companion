@@ -20,8 +20,8 @@ import CoreBase from '../Core/Base.js'
 import { MAX_BUTTONS, MAX_BUTTONS_PER_ROW } from '../Resources/Constants.js'
 import { toDeviceKey, toGlobalKey } from '../Resources/Util.js'
 import { CreateBankControlId } from '../Shared/ControlId.js'
-import { Complete, Registry } from '../tmp.js'
-import { ISurface, SurfaceConfig } from './info.js'
+import { ButtonRender, Complete, Registry } from '../tmp.js'
+import { ISurface, SurfaceConfig, SurfaceDrawStyle } from './info.js'
 
 export interface SurfaceConfigExt extends SurfaceConfig {
 	use_last_page: boolean
@@ -251,11 +251,11 @@ class SurfaceHandler extends CoreBase {
 			if (this.isSurfaceLocked) {
 				const buffers = this.graphics.getImagesForPincode(this.currentPincodeEntry)
 				this.panel.clearDeck()
-				this.#drawButton(PINCODE_CODE_POSITION, buffers.code.buffer)
+				this.#drawButton(PINCODE_CODE_POSITION, buffers.code.buffer, undefined)
 
 				PINCODE_NUMBER_POSITIONS.forEach((key, i) => {
 					if (buffers[i]) {
-						this.#drawButton(key, buffers[i].buffer)
+						this.#drawButton(key, buffers[i].buffer, undefined)
 					}
 				})
 			} else if (this.#xkeysPageCount > 0) {
@@ -275,7 +275,7 @@ class SurfaceHandler extends CoreBase {
 		}
 	}
 
-	#drawButton(key: number, buffer: Buffer | undefined, style): void {
+	#drawButton(key: number, buffer: Buffer | undefined, style: SurfaceDrawStyle | undefined): void {
 		const localKey = toDeviceKey(this.panel.info.keysTotal, this.panel.info.keysPerRow, key)
 		if (localKey >= 0 && localKey < this.panel.info.keysTotal) {
 			this.panel.draw(localKey, buffer, style)
@@ -305,7 +305,7 @@ class SurfaceHandler extends CoreBase {
 		}
 	}
 
-	onBankInvalidated(page: number, bank: number, render) {
+	onBankInvalidated(page: number, bank: number, render: ButtonRender): void {
 		// If device is locked ignore updates. pincode updates are handled separately
 		if (this.isSurfaceLocked) return
 
@@ -411,13 +411,13 @@ class SurfaceHandler extends CoreBase {
 				if (this.isSurfaceLocked) {
 					// Update lockout button
 					const datap = this.graphics.getImagesForPincode(this.currentPincodeEntry)
-					this.#drawButton(PINCODE_CODE_POSITION, datap.code.buffer)
+					this.#drawButton(PINCODE_CODE_POSITION, datap.code.buffer, undefined)
 				}
 			}
 		}
 	}
 
-	onDeviceRotate(key: number, direction: boolean, pageOffset: number): void {
+	onDeviceRotate(key: number, direction: boolean, pageOffset?: number): void {
 		if (this.panel) {
 			key = toGlobalKey(this.panel.info.keysPerRow, key)
 

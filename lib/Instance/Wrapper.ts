@@ -55,9 +55,11 @@ import {
 	ReceiveInputFieldStaticText,
 	ReceiveInputFieldTextInput,
 } from './Convert.js'
-import FragmentFeedbacks from '../Controls/Fragments/FragmentFeedbacks.js'
-import FragmentActions from '../Controls/Fragments/FragmentActions.js'
-import { Request, Response } from 'express'
+import type FragmentFeedbacks from '../Controls/Fragments/FragmentFeedbacks.js'
+import type FragmentActions from '../Controls/Fragments/FragmentActions.js'
+import type { Request, Response } from 'express'
+import type Respawn from 'respawn'
+import { InstanceStoreConfig } from './Controller.js'
 
 class SocketEventsHandler {
 	registry: Registry
@@ -72,7 +74,7 @@ class SocketEventsHandler {
 	ipcWrapper: IpcWrapper<HostToModuleEventsV0, ModuleToHostEventsV0>
 	unsubListeners: () => void
 
-	constructor(registry: Registry, instanceStatus: InstanceStatuses, monitor, connectionId: string) {
+	constructor(registry: Registry, instanceStatus: InstanceStatuses, monitor: Respawn, connectionId: string) {
 		this.logger = LogController.createLogger(`Instance/Wrapper/${connectionId}`)
 
 		this.registry = registry
@@ -122,7 +124,7 @@ class SocketEventsHandler {
 	 * Initialise the instance class running in the child process
 	 * @param {object} config
 	 */
-	async init(config) {
+	async init(config: InstanceStoreConfig) {
 		this.logger = LogController.createLogger(`Instance/Wrapper/${config.label}`)
 		this.label = config.label
 
@@ -131,10 +133,10 @@ class SocketEventsHandler {
 
 		const msg = await this.ipcWrapper.sendWithCb('init', {
 			label: config.label,
-			isFirstInit: config.isFirstInit,
+			isFirstInit: !!config.isFirstInit,
 			config: config.config,
 
-			lastUpgradeIndex: config.lastUpgradeIndex,
+			lastUpgradeIndex: config.lastUpgradeIndex ?? -1,
 
 			// Pass all actions and feedbacks for upgrading and initial subscribe calls
 			actions: allActions,

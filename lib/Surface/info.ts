@@ -1,5 +1,5 @@
 import EventEmitter from 'eventemitter3'
-import { SocketClient } from '../tmp'
+import { ButtonDrawStyle, SocketClient } from '../tmp'
 
 export interface SurfaceInfo {
 	type: string
@@ -28,12 +28,14 @@ export type ISurfaceEvents = {
 	'xkeys-setVariable': [name: string, value: number]
 }
 
+export type SurfaceDrawStyle = 'pageup' | 'pagedown' | 'pagenum' | ButtonDrawStyle | undefined
+
 export interface ISurface extends EventEmitter<ISurfaceEvents> {
 	info: SurfaceInfo
 
 	quit(): void
 
-	draw(key: number, buffer: Buffer | undefined, style): boolean
+	draw(key: number, buffer: Buffer | undefined, style: SurfaceDrawStyle): boolean
 
 	clearDeck(): void
 

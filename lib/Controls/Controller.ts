@@ -913,7 +913,7 @@ class ControlsController extends CoreBase {
 	 * @param {Array} removedVariables - variables that have been removed
 	 * @access public
 	 */
-	onVariablesChanged(changedVariables: Record<string, any>, removedVariables: string[]) {
+	onVariablesChanged(changedVariables: Record<string, any>, removedVariables: string[]): void {
 		const allChangedVariables = [...removedVariables, ...Object.keys(changedVariables)]
 
 		// Inform triggers of the change

@@ -47,7 +47,7 @@ interface ModuleDisplayInfo {
 	isLegacy?: boolean
 }
 
-interface ModuleInfo {
+export interface ModuleInfo {
 	manifest: ModuleManifest
 	basePath: string
 	helpPath: string | null
@@ -66,6 +66,7 @@ export interface InstanceStoreConfig {
 	sortOrder: number
 
 	isFirstInit?: boolean
+	lastUpgradeIndex?: number
 }
 
 export interface UiInstanceConfig {

@@ -78,7 +78,7 @@ export default class ControlButtonPageNumber extends ControlBase<PageNumberConfi
 	 * @access public
 	 */
 	pressControl(pressed: boolean, deviceId: string | undefined): void {
-		if (pressed) {
+		if (pressed && deviceId) {
 			this.surfaces.devicePageSet(deviceId, 1)
 		}
 	}
@@ -93,5 +93,9 @@ export default class ControlButtonPageNumber extends ControlBase<PageNumberConfi
 		return {
 			type: this.type,
 		}
+	}
+
+	forgetInstance(): void {
+		// Nothing to do
 	}
 }

@@ -20,7 +20,7 @@ import { cloneDeep } from 'lodash-es'
 import LogController from '../../Log/Controller.js'
 import jsonPatch from 'fast-json-patch'
 import debounceFn from 'debounce-fn'
-import { ISurface, ISurfaceEvents, SurfaceConfig, SurfaceInfo } from '../info.js'
+import { ISurface, ISurfaceEvents, SurfaceConfig, SurfaceDrawStyle, SurfaceInfo } from '../info.js'
 import { Registry, SocketClient } from '../../tmp.js'
 import UIHandler from '../../UI/Handler.js'
 
@@ -111,7 +111,7 @@ class SurfaceIPElgatoEmulator extends EventEmitter<ISurfaceEvents> implements IS
 
 	quit(): void {}
 
-	draw(key: number, buffer: Buffer | undefined, style): boolean {
+	draw(key: number, buffer: Buffer | undefined, _style: SurfaceDrawStyle | undefined): boolean {
 		if (buffer === undefined || buffer.length != 15552) {
 			this.logger.verbose('buffer was not 15552, but ', buffer?.length)
 			return false

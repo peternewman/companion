@@ -199,7 +199,7 @@ export interface ButtonDrawImageBuffer {
 export interface ButtonRender {
 	updated: number
 	buffer: Buffer
-	style?: any // TODO
+	style: 'pageup' | 'pagedown' | 'pagenum' | SomeDrawStyle | undefined
 }
 
 export interface ActionInstance {
