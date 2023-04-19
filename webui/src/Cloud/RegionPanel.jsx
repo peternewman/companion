@@ -41,7 +41,13 @@ export class CloudRegionPanel extends Component {
 	}
 
 	cloudSetState(newState) {
-		this.props.socket.emit('cloud_region_state_set', this.props.id, newState)
+		if (!this.props.disabled) {
+			this.props.socket.emit('cloud_region_state_set', this.props.id, newState)
+			// Reset the error message if the user changes the enabled state
+			if (newState.enabled !== undefined) {
+				this.setState({ error: '' })
+			}
+		}
 	}
 
 	shouldComponentUpdate(_nextProps, nextState) {
@@ -72,13 +78,14 @@ export class CloudRegionPanel extends Component {
 						onChange={(e) => this.cloudSetState({ enabled: e.target.checked })}
 						labelOff={'Off'}
 						labelOn={'On'}
+						disabled={this.props.disabled}
 						width={100}
 					/>{' '}
 				</span>
 				<span style={{ ...styleText, ...(this.state.connected ? onlineServerStyle : {}) }}>
 					{this.state.name} {this.state.pingResults > -1 ? `(${this.state.pingResults}ms)` : ''}
 				</span>
-				{this.state.error !== '' && (
+				{this.state.enabled && this.state.error !== '' && (
 					<span
 						style={{
 							backgroundColor: 'red',
