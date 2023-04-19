@@ -50,15 +50,6 @@ export class CloudRegionPanel extends Component {
 		}
 	}
 
-	shouldComponentUpdate(_nextProps, nextState) {
-		const a = JSON.stringify(nextState)
-		const b = JSON.stringify(this.state)
-		if (a !== b) {
-			return true
-		}
-		return false
-	}
-
 	render() {
 		const styleText = {
 			marginLeft: 6,
@@ -68,6 +59,8 @@ export class CloudRegionPanel extends Component {
 			paddingTop: 19,
 		}
 
+		console.log("render");
+		
 		return (
 			<div style={{ clear: 'both' }}>
 				<span style={{ display: 'inline-block', paddingTop: 5, float: 'left' }}>
@@ -82,7 +75,7 @@ export class CloudRegionPanel extends Component {
 						width={100}
 					/>{' '}
 				</span>
-				<span style={{ ...styleText, ...(this.state.connected ? onlineServerStyle : {}) }}>
+				<span style={{ ...styleText, ...(this.state.connected ? onlineServerStyle : ( this.props.disabled ? { opacity: 0.5 } : {})) }}>
 					{this.state.name} {this.state.pingResults > -1 ? `(${this.state.pingResults}ms)` : ''}
 				</span>
 				{this.state.enabled && this.state.error !== '' && (

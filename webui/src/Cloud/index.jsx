@@ -4,6 +4,7 @@ import React, { Component } from 'react'
 import { CInput, CButton, CCallout } from '@coreui/react'
 import { CloudRegionPanel } from './RegionPanel'
 import { CloudUserPass } from './UserPass'
+import CSwitch from '../CSwitch'
 
 // The cloud part is written in old fashioned Class-components because I am most
 // familiar with it
@@ -18,6 +19,7 @@ export class Cloud extends Component {
 			authenticated: false,
 			uuid: '',
 			authenticating: false,
+			cloudActive: false,
 		}
 
 		this.regions = {}
@@ -62,12 +64,7 @@ export class Cloud extends Component {
 	}
 
 	render() {
-		const regions = []
-		for (let id in this.state.regions) {
-			let region = this.state.regions[id]
-
-			regions.push(<CloudRegionPanel key={id} id={region} socket={this.props.socket} />)
-		}
+		const regions = this.state.regions || []
 		console.log('Render: state:', this.state)
 		return (
 			<div
@@ -134,7 +131,7 @@ export class Cloud extends Component {
 								marginBottom: 16,
 							}}
 						>
-							<label>Logged in as</label>
+							<div style={{ fontWeight: 'bold', fontSize: 15, marginBottom: 4 }}>Logged in as</div>
 							<CInput
 								readOnly
 								type="text"
@@ -143,21 +140,51 @@ export class Cloud extends Component {
 								}}
 								value={this.state.authenticatedAs}
 							/>
+							<div style={{ marginTop: 20 }}>
+								<CButton
+									color="success"
+									onClick={() => {
+										this.setState({ error: null })
+										this.props.socket.emit('cloud_logout')
+									}}
+								>
+									Log out
+								</CButton>
+							</div>
 						</div>
+						{this.state.authenticated && (
+							<div>
+								<div style={{ fontWeight: 'bold', fontSize: 15, marginBottom: 4 }}>Cloud regions</div>
+								{regions.map((region) => (
+									<CloudRegionPanel
+										key={region}
+										disabled={this.state.cloudActive}
+										id={region}
+										socket={this.props.socket}
+									/>
+								))}
+								<CCallout color={this.state.cloudActive ? 'standard' : 'success'}>
+									{this.state.cloudActive ? (
+										<div style={{ fontSize: 14, clear: 'both' }}>
+											Companion Cloud is currently activated. You can not change the regions before you deactivate it.
+										</div>
+									) : (
+										<div style={{ fontSize: 15, clear: 'both' }}>
+											Please select the regions that is closest to you. You need to select at least two regions for
+											redundancy. You will have access to two regions per Companion Cloud license.
+										</div>
+									)}
+								</CCallout>
+								<CSwitch
+									color="success"
+									title="Activate Companion Cloud"
+									checked={this.state.cloudActive}
+									onChange={(e) => this.cloudSetState({ cloudActive: e.target.checked })}
+								/>
+								<span style={{ marginLeft: 10, fontSize: 15, fontWeight: 'bold' }}>Activate Companion Cloud</span>
+							</div>
+						)}
 
-						{this.state.authenticated && <div>{regions}</div>}
-
-						<div style={{ marginTop: 20 }}>
-							<CButton
-								color="success"
-								onClick={() => {
-									this.setState({ error: null })
-									this.props.socket.emit('cloud_logout')
-								}}
-							>
-								Log out
-							</CButton>
-						</div>
 						{this.state.authenticated && (
 							<div style={{ marginTop: 15 }}>
 								<div style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 4 }}>Super secret key</div>
@@ -177,9 +204,9 @@ export class Cloud extends Component {
 									{this.state.uuid}
 								</div>
 								<div style={{ marginTop: 5 }}>
-									This key should now be online and reachable for companion cloud instances. Go to the connections tab
-									in another companion and search for "companion cloud", and add it with the key above to start
-									controlling this companion via internet.
+									When you have successfully connected to two or more regions, you can use this key in another remote
+									companion to control this companion. Go to the connections tab in another companion and search for
+									"companion cloud", and add it with the key above to start controlling this companion via internet.
 								</div>
 							</div>
 						)}
