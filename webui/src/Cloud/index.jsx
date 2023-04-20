@@ -65,7 +65,7 @@ export class Cloud extends Component {
 
 	render() {
 		const regions = this.state.regions || []
-		console.log('Render: state:', this.state)
+
 		return (
 			<div
 				style={{

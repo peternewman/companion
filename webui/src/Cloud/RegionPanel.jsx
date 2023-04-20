@@ -35,7 +35,6 @@ export class CloudRegionPanel extends Component {
 
 	cloudStateDidUpdate(id, newState) {
 		if (id === this.props.id) {
-			console.log(`cloud region ${id} state did update to:`, newState)
 			this.setState({ ...newState })
 		}
 	}
@@ -59,8 +58,6 @@ export class CloudRegionPanel extends Component {
 			paddingTop: 19,
 		}
 
-		console.log("render");
-		
 		return (
 			<div style={{ clear: 'both' }}>
 				<span style={{ display: 'inline-block', paddingTop: 5, float: 'left' }}>
@@ -75,7 +72,12 @@ export class CloudRegionPanel extends Component {
 						width={100}
 					/>{' '}
 				</span>
-				<span style={{ ...styleText, ...(this.state.connected ? onlineServerStyle : ( this.props.disabled ? { opacity: 0.5 } : {})) }}>
+				<span
+					style={{
+						...styleText,
+						...(this.state.connected ? onlineServerStyle : this.props.disabled ? { opacity: 0.5 } : {}),
+					}}
+				>
 					{this.state.name} {this.state.pingResults > -1 ? `(${this.state.pingResults}ms)` : ''}
 				</span>
 				{this.state.enabled && this.state.error !== '' && (
