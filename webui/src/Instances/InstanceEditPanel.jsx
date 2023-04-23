@@ -310,15 +310,7 @@ function ConfigField({ setValue, setValid, definition, value }) {
 		case 'colorpicker':
 			return <ColorInputField value={value} setValue={setValue2} setValid={setValid2} />
 		case 'bonjour-device':
-			return (
-				<BonjourDeviceInputField
-					value={value}
-					setValue={setValue2}
-					filter={definition.bonjour}
-					allowNone={definition.allowNone}
-					noneLabel={definition.noneLabel}
-				/>
-			)
+			return <BonjourDeviceInputField value={value} setValue={setValue2} filter={definition.bonjourQuery} />
 		default:
 			return <p>Unknown field "{definition.type}"</p>
 	}
