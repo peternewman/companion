@@ -8,6 +8,7 @@ import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons'
 import sanitizeHtml from 'sanitize-html'
 import { isLabelValid } from '@companion/shared/Label'
 import CSwitch from '../CSwitch'
+import { BonjourDeviceInputField } from '../Components/BonjourDeviceInputField'
 
 export function InstanceEditPanel({ instanceId, instanceStatus, doConfigureInstance, showHelp }) {
 	console.log('status', instanceStatus)
@@ -308,6 +309,16 @@ function ConfigField({ setValue, setValid, definition, value }) {
 			)
 		case 'colorpicker':
 			return <ColorInputField value={value} setValue={setValue2} setValid={setValid2} />
+		case 'bonjour-device':
+			return (
+				<BonjourDeviceInputField
+					value={value}
+					setValue={setValue2}
+					filter={definition.bonjour}
+					allowNone={definition.allowNone}
+					noneLabel={definition.noneLabel}
+				/>
+			)
 		default:
 			return <p>Unknown field "{definition.type}"</p>
 	}
