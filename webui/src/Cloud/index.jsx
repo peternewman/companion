@@ -1,7 +1,7 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faInfoCircle } from '@fortawesome/free-solid-svg-icons'
 import React, { Component } from 'react'
-import { CInput, CButton, CCallout } from '@coreui/react'
+import { CInput, CButton, CCallout, CCard, CCardBody, CCardHeader, CListGroup } from '@coreui/react'
 import { CloudRegionPanel } from './RegionPanel'
 import { CloudUserPass } from './UserPass'
 import CSwitch from '../CSwitch'
@@ -10,17 +10,21 @@ import CSwitch from '../CSwitch'
 // familiar with it
 
 export class Cloud extends Component {
+	/**
+	 * @type {CloudControllerState}
+	 */
+	state = {
+		enabled: false,
+		error: null,
+		authenticated: false,
+		uuid: '',
+		authenticating: false,
+		cloudActive: false,
+		canActivate: false,
+	}
+
 	constructor(props) {
 		super(props)
-
-		this.state = {
-			enabled: false,
-			error: null,
-			authenticated: false,
-			uuid: '',
-			authenticating: false,
-			cloudActive: false,
-		}
 
 		this.regions = {}
 
@@ -46,6 +50,11 @@ export class Cloud extends Component {
 		this.setState({ ...newState })
 	}
 
+	/**
+	 * Set a new state for the cloud controller
+	 *
+	 * @param {Partial<CloudControllerState>} newState
+	 */
 	cloudSetState(newState) {
 		this.props.socket.emit('cloud_state_set', newState)
 	}
@@ -153,36 +162,45 @@ export class Cloud extends Component {
 							</div>
 						</div>
 						{this.state.authenticated && (
-							<div>
-								<div style={{ fontWeight: 'bold', fontSize: 15, marginBottom: 4 }}>Cloud regions</div>
-								{regions.map((region) => (
-									<CloudRegionPanel
-										key={region}
-										disabled={this.state.cloudActive}
-										id={region}
-										socket={this.props.socket}
-									/>
-								))}
-								<CCallout color={this.state.cloudActive ? 'standard' : 'success'}>
+							<CCard>
+								<CCardHeader style={{ backgroundColor: '#eee', fontWeight: 600 }}>Cloud regions</CCardHeader>
+								{!this.state.cloudActive ? (
+									<CCardBody style={this.state.cloudActive ? { opacity: 0.5 } : {}}>
+										Please select the regions that is closest to you. You need to select at least <b>two regions</b>{' '}
+										which will give you redundancy.
+									</CCardBody>
+								) : null}
+								<CListGroup flush>
+									{regions.map((region) => (
+										<CloudRegionPanel
+											key={region}
+											disabled={this.state.cloudActive}
+											id={region}
+											socket={this.props.socket}
+										/>
+									))}
+								</CListGroup>
+								<CCardBody>
 									{this.state.cloudActive ? (
-										<div style={{ fontSize: 14, clear: 'both' }}>
-											Companion Cloud is currently activated. You can not change the regions before you deactivate it.
-										</div>
-									) : (
-										<div style={{ fontSize: 15, clear: 'both' }}>
-											Please select the regions that is closest to you. You need to select at least two regions for
-											redundancy. You will have access to two regions per Companion Cloud license.
-										</div>
-									)}
-								</CCallout>
-								<CSwitch
-									color="success"
-									title="Activate Companion Cloud"
-									checked={this.state.cloudActive}
-									onChange={(e) => this.cloudSetState({ cloudActive: e.target.checked })}
-								/>
-								<span style={{ marginLeft: 10, fontSize: 15, fontWeight: 'bold' }}>Activate Companion Cloud</span>
-							</div>
+										<CCallout color={this.state.cloudActive ? 'info' : 'success'}>
+											<div style={{ fontSize: 14, clear: 'both' }}>
+												Companion Cloud is currently activated. You can not change the regions before you deactivate it.
+											</div>
+										</CCallout>
+									) : null}
+									<span style={{ display: 'inline-block', float: 'left' }}>
+										<CSwitch
+											color="success"
+											disabled={!this.state.cloudActive && !this.state.canActivate}
+											title="Activate Companion Cloud"
+											checked={this.state.cloudActive}
+											onChange={(e) => this.cloudSetState({ cloudActive: e.target.checked })}
+										/>
+									</span>
+
+									<span style={{ marginLeft: 10, fontSize: 15, fontWeight: 'bold' }}>Activate Companion Cloud</span>
+								</CCardBody>
+							</CCard>
 						)}
 
 						{this.state.authenticated && (
@@ -225,3 +243,19 @@ export class Cloud extends Component {
 		)
 	}
 }
+
+/**
+ * @typedef {Object} CloudControllerState
+ *
+ * @property {string} uuid - the machine UUID
+ * @property {boolean} authenticating - is the cloud authenticating
+ * @property {boolean} authenticated - is the cloud authenticated
+ * @property {string} authenticatedAs - the cloud username
+ * @property {boolean} ping - is someone watching ping info?
+ * @property {Array} regions - the cloud regions
+ * @property {string} tryUsername - the username to try
+ * @property {string} tryPassword - the password to try
+ * @property {null|string} tryError - the error message
+ * @property {boolean} cloudActive - is the cloud active
+ * @property {boolean} canActivate - can the cloud be activated
+ */

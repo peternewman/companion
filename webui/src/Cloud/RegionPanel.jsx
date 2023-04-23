@@ -1,5 +1,5 @@
 import React, { Component } from 'react'
-import { CSwitch } from '@coreui/react'
+import { CAlert, CListGroupItem, CSwitch } from '@coreui/react'
 
 // The cloud part is written in old fashioned Class-components
 // because even if the hipsters say it's slow and retarted, i think it's prettier.
@@ -58,11 +58,10 @@ export class CloudRegionPanel extends Component {
 			paddingTop: 19,
 		}
 
-		return (
-			<div style={{ clear: 'both' }}>
+		return !this.props.disabled || this.state.enabled ? (
+			<CListGroupItem>
 				<span style={{ display: 'inline-block', paddingTop: 5, float: 'left' }}>
 					<CSwitch
-						variant="3d"
 						color={this.state.connected ? 'success' : 'danger'}
 						checked={!!this.state.enabled}
 						onChange={(e) => this.cloudSetState({ enabled: e.target.checked })}
@@ -81,19 +80,11 @@ export class CloudRegionPanel extends Component {
 					{this.state.name} {this.state.pingResults > -1 ? `(${this.state.pingResults}ms)` : ''}
 				</span>
 				{this.state.enabled && this.state.error !== '' && (
-					<span
-						style={{
-							backgroundColor: 'red',
-							color: 'white',
-							padding: '0.2em 0.5em',
-							borderRadius: '0.25em',
-							margin: '0.5em',
-						}}
-					>
+					<CAlert color="danger" style={{ marginTop: '10px', marginBottom: 0 }}>
 						{this.state.error}
-					</span>
+					</CAlert>
 				)}
-			</div>
-		)
+			</CListGroupItem>
+		) : null
 	}
 }
