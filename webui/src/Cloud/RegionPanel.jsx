@@ -65,8 +65,6 @@ export class CloudRegionPanel extends Component {
 						color={this.state.connected ? 'success' : 'danger'}
 						checked={!!this.state.enabled}
 						onChange={(e) => this.cloudSetState({ enabled: e.target.checked })}
-						labelOff={'Off'}
-						labelOn={'On'}
 						disabled={this.props.disabled}
 						width={100}
 					/>{' '}
