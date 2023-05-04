@@ -15,4 +15,4 @@ jobs:
           yarn
       - name: check format
         run: |
-          yarn prettier --check .
+          yarn prettier --loglevel debug --check .
