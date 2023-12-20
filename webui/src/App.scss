@@ -1,14 +1,16 @@
 @import 'scss/variables';
 
-@import '~@coreui/coreui/scss/coreui';
-@import '~tributejs/src/tribute';
+@import '@coreui/coreui/scss/coreui';
+@import 'tributejs/src/tribute';
 @import 'scss/react-time-picker';
 
 @import 'scss/layout';
 @import 'scss/common';
 @import 'scss/tablet';
+@import 'scss/emulator';
 
-@import 'scss/bank';
+@import 'scss/action-recorder';
+@import 'scss/button-control';
 @import 'scss/button-edit';
 @import 'scss/button-grid';
 @import 'scss/controls';
@@ -17,7 +19,6 @@
 @import 'scss/log';
 @import 'scss/presets';
 @import 'scss/settings';
-@import 'scss/wizard';
 
 @keyframes fadeIn {
 	from {
@@ -78,16 +79,6 @@
 			max-width: 100%;
 		}
 	}
-}
-
-.page-emulator {
-	background-color: white;
-	padding: 1px;
-
-	min-height: 100vh;
-	min-width: 1000px;
-
-	text-align: center;
 }
 
 .modal-body img {

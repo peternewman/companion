@@ -1,6 +1,78 @@
 # Bitfocus Companion
 
-## Companion v3.1.0 - Release Notes (unreleased)
+## Companion v3.2.0 - Release Notes (unreleased)
+
+Up to 13984f3b4c3fb4f206cadfa5549573734f8e6432
+
+### 📣 CORE FEATURES AND IMPROVEMENTS
+
+- Button grid can be resized to be smaller or larger than the default 8x4
+- Rework button image drawing, to be higher resolution. This changes some font sizes slightly.
+
+- Improved surface rotation, which rotates the whole surface not just the drawing of each button
+- Change surface image scaling library to reduce install size and improve performance
+- Use async HID library, removing spawning of child processes to handle HID devices
+- Add fontsize and image scaling to satellite api
+- Elgato Plugin performance improvements
+- Export and import compressed configs
+- Add support for Loupedeck CT
+- Add support for Videohub Panel as a surface
+- Send compressed button renders to webui
+- Emulators can have their grid size changed
+- Tablet page performance improvements
+- Bonjour discovery broker to assist modules in discovering possible devices to control
+- Indicate variables support on text input fields
+- Internal action to set or create custom variable
+- Slow down connection initiaisation at startup, to avoid crashes on lower power machines
+- Change webui build tooling to be more modern
+- Rework backend code to be loosely typed
+- Rework various api implementations, to support customisable grid size and avoid 'bank' terminology
+-
+
+### 🐞 BUG FIXES
+
+- Streamdeck Plus LCD strip image positioning
+-
+
+### 🧩 NEW & UPDATED MODULES
+
+## Companion v3.1.2 - Release Notes
+
+### 🐞 BUG FIXES
+
+- Fixed xkeys unable to show colours
+- Fixed https binding to wrong port at startup (#2610)
+- Fixed switching between version branches failing on windows
+- Fixed crash with fresh config (#2557, #2615)
+- Added default for lastUpgradeIndex (#2627)
+- Updated some vulnerable dependencies
+- Ensured timed triggers dont trigger when enabled unexpectedly (#2626)
+- Fixed handle missing property in import (#2627)
+
+### 🐞 MODULE FIXES
+
+- dataton-watchout
+- etc-eos
+- generic-mqtt
+- globalcache-itac-cc
+- grassvalley-amp
+- presentationtools-aps
+- ptzoptics-visca
+- qsys-remote-control
+- shelly-ws
+- softron-movierecorder
+- videolan-vlc
+- vistream-online
+
+## Companion v3.1.1 - Release Notes
+
+### 🐞 BUG FIXES
+
+- Fix Companion importing confir from 2.4 instead of 3.0 at first start of 3.1
+- Companion cloud buttons missing some status fields
+- Update pngjs to improve draw performance
+
+## Companion v3.1.0 - Release Notes
 
 ### 📣 CORE FEATURES AND IMPROVEMENTS
 
@@ -27,8 +99,76 @@
 - Fix artnet listener
 - Handle presets where feedbacks options are undefined
 - Validate config path to import before importing
+- Fix sunrise/sunset triggers causing crash
+- Parsing variables containing `$` would result in incorrect output
 
 ### 🧩 NEW & UPDATED MODULES
+
+- agf-characterworks
+- aja-helo
+- allenheath-ahm
+- analogway-midra
+- aws-elementallive
+- barco-eventmaster
+- birddog-ptz
+- bmd-atem
+- bmd-teranex
+- bmd-videohub
+- bmd-webpresenter
+- bytehive-playoutbee
+- canon-ptz
+- christie-spyder
+- dashare-multiplay
+- figure53-qlab-advance
+- generic-http
+- generic-pjlink
+- generic-sacn
+- generic-tcp-serial
+- generic-timezone
+- getontime-ontime
+- glensound-divine
+- globalcache-itac-ir
+- globalcache-itac-sl
+- iccms-sib
+- jozeemedia-jcounter
+- lea-amplifier
+- leolabs-ableset
+- leonreucher-vstopowerpoint
+- magnimage-mig-ec
+- microsoft-teams
+- monospace-lightkey
+- netgear-avline
+- netio-powerbox
+- newtek-tricaster
+- novastar-coex
+- novastar-controller
+- novastar-d12
+- openweather-rest
+- panasonic-kairos
+- panasonic-panapod
+- panasonic-ptz
+- pixelhue-fseries
+- pnh-opencountdown
+- presentationtools-aps
+- presentationtools-cuetimer
+- shelly-http
+- shelly-ws
+- shure-mxw
+- skaarhoj-rawpanel
+- sonos-speakers
+- squared-powerlink
+- telegram-bot
+- tellyo-streamstudio
+- tesla-smart
+- tesmart-hdmimatrix
+- tslproducts-umd
+- utahscientific-bpspanel
+- videolan-vlc
+- visualproductions-timecore
+- wled-websocket
+- youtube-live
+- zenvideo-ndirouter
+- zoom-osc-iso
 
 ## Companion v3.0.1 - Release Notes
 

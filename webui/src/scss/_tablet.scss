@@ -14,7 +14,7 @@
 	}
 
 	.container-fluid {
-		max-width: 1200px;
+		// max-width: 1200px;
 		height: 100%;
 		margin: 0 auto;
 	}
@@ -75,16 +75,26 @@
 
 		width: 100%;
 
-		.bank img {
+		.button-control {
+			border: none;
+			position: absolute;
+			float: left;
+		}
+
+		.button-control img {
 			max-width: 150px;
 			max-height: 150px;
 		}
 
-		&.bank-armed .pagebank-row {
+		&.button-armed .buttongrid-row {
 			background-color: rgba(255, 0, 0, 0.5);
 		}
 
-		.pagebank-row {
+		.buttons-holder {
+			position: relative;
+		}
+
+		.buttongrid-row {
 			display: grid;
 			// grid-auto-flow: column;
 			grid-auto-columns: 1fr;
@@ -98,6 +108,16 @@
 
 		.page-heading {
 			grid-column: 1/-1;
+		}
+
+		.page-buttons {
+			position: relative;
+		}
+
+		.page-in-view-tester {
+			position: absolute;
+			float: left;
+			width: 100%;
 		}
 	}
 }
