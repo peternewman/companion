@@ -6,12 +6,9 @@
             "pattern": [
                 {
                     "regexp": "\\[warn\\] (.+?)$",
-                    "file": 1
+                    "file": 1,
+                    "message": "Code style issues found in file. Run Prettier to fix."
                 },
-                {
-                    "regexp": "\\[warn\\] (.+?)$",
-                    "message": 1
-                }
             ]
         }
     ]
