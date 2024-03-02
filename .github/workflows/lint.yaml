@@ -18,6 +18,8 @@ jobs:
           yarn config set httpTimeout 100000
 
           yarn install --immutable
+      - name: Enable Problem Matcher for GitHub annotations
+        run: echo "::add-matcher::.github/problem-matcher-prettier.json"
       - name: check format
         run: |
           yarn prettier --check .
