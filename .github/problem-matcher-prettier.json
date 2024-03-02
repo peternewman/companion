@@ -1,15 +1,15 @@
 {
-    "problemMatcher": [
+  "problemMatcher": [
+    {
+      "owner": "prettier",
+      "severity": "warning",
+      "pattern": [
         {
-            "owner": "prettier",
-            "severity": "warning",
-            "pattern": [
-                {
-                    "regexp": "\\[(warn)\\] (.+?)$",
-                    "message": 1,
-                    "file": 2,
-                },
-            ]
+          "regexp": "\\[(warn)\\] (.+?)$",
+          "message": 1,
+          "file": 2
         }
-    ]
+      ]
+    }
+  ]
 }
