@@ -6,8 +6,7 @@
             "pattern": [
                 {
                     "regexp": "\\[warn\\] (.+?)$",
-                    "file": 1,
-                    "message": "Code style issues found in file. Run Prettier to fix."
+                    "file": 1
                 },
             ]
         }
