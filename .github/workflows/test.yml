@@ -17,6 +17,7 @@ jobs:
           YARN_ENABLE_IMMUTABLE_INSTALLS: false
         run: |
           YARN_ENABLE_IMMUTABLE_INSTALLS=false
+          rm yarn.lock
           corepack enable
 
           # try and avoid timeout errors
