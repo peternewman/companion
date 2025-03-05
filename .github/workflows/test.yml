@@ -19,7 +19,9 @@ jobs:
           # try and avoid timeout errors
           yarn config set httpTimeout 100000
 
-          yarn install --immutable
+          #yarn install --immutable
+          yarn install
+          cat yarn.lock
 
           yarn build:ts
       - name: run tests
