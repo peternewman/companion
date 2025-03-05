@@ -1244,6 +1244,7 @@ __metadata:
     ps-tree: "npm:^1.2.0"
     semver: "npm:^7.7.1"
     typescript: "npm:~5.7.3"
+    unicode-segmenter: "npm:^0.11.3"
   languageName: unknown
   linkType: soft
 
@@ -16055,6 +16056,7 @@ asn1@evs-broadcast/node-asn1:
 "unicode-segmenter@npm:^0.11.3":
   version: 0.11.3
   resolution: "unicode-segmenter@npm:0.11.3"
+  checksum: 10c0/e5f6c16ebd2112eb6e447436ebaa525deb69705a609e6e19161c779ae738f1c2325b96cd986d5099c0f9b8c92538940d41d77237dd5a169230bb8405ec5f4835
   languageName: node
   linkType: hard
 

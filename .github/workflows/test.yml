@@ -16,15 +16,15 @@ jobs:
         env:
           YARN_ENABLE_IMMUTABLE_INSTALLS: false
         run: |
-          YARN_ENABLE_IMMUTABLE_INSTALLS=false
-          rm yarn.lock
+          #YARN_ENABLE_IMMUTABLE_INSTALLS=false
+          #rm yarn.lock
           corepack enable
 
           # try and avoid timeout errors
           yarn config set httpTimeout 100000
 
-          #yarn install --immutable
-          yarn install
+          yarn install --immutable
+          #yarn install
           cat yarn.lock
 
           yarn build:ts
