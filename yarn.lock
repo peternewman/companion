@@ -16052,6 +16052,12 @@ asn1@evs-broadcast/node-asn1:
   languageName: node
   linkType: hard
 
+"unicode-segmenter@npm:^0.11.3":
+  version: 0.11.3
+  resolution: "unicode-segmenter@npm:0.11.3"
+  languageName: node
+  linkType: hard
+
 "unified@npm:^11.0.0":
   version: 11.0.5
   resolution: "unified@npm:11.0.5"

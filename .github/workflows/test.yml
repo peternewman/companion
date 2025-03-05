@@ -13,7 +13,10 @@ jobs:
         with:
           node-version-file: '.node-version'
       - name: yarn install
+        env:
+          YARN_ENABLE_IMMUTABLE_INSTALLS: false
         run: |
+          YARN_ENABLE_IMMUTABLE_INSTALLS=false
           corepack enable
 
           # try and avoid timeout errors
